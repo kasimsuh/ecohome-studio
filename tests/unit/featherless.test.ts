@@ -5,7 +5,7 @@ const { mockCreateCompletion, mockOpenAI } = vi.hoisted(() => ({
   mockOpenAI: vi.fn(),
 }));
 
-vi.mock("openai", () => ({
+vi.mock("openai-v6", () => ({
   default: mockOpenAI.mockImplementation(() => ({
     chat: {
       completions: {

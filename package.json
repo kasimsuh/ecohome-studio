@@ -21,7 +21,7 @@
     "@supabase/supabase-js": "^2.105.4",
     "clsx": "^2.1.1",
     "next": "^15.0.0",
-    "openai": "^6.37.0",
+    "openai-v6": "npm:openai@^6.37.0",
     "pdf-parse": "^2.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
