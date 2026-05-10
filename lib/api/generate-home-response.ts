@@ -2,9 +2,13 @@ type GuidanceDiagnostics = {
   requestedLimit: number;
   supabaseAttempted: boolean;
   supabaseMatchCount: number;
+  watsonxAttempted: boolean;
+  watsonxMatchCount: number;
+  watsonxUsed: boolean;
   localFallbackUsed: boolean;
-  localFallbackReason?: string | null;
+  fallbackReason?: string | null;
   supabaseError?: string | null;
+  watsonxError?: string | null;
   localFallbackError?: string | null;
 };
 
@@ -42,11 +46,14 @@ export function buildGenerateHomeResponseHeaders({
     "x-ecohome-rag-query-limit": String(diagnostics.requestedLimit),
     "x-ecohome-rag-supabase-attempted": String(diagnostics.supabaseAttempted),
     "x-ecohome-rag-supabase-match-count": String(diagnostics.supabaseMatchCount),
+    "x-ecohome-rag-watsonx-attempted": String(diagnostics.watsonxAttempted),
+    "x-ecohome-rag-watsonx-match-count": String(diagnostics.watsonxMatchCount),
+    "x-ecohome-rag-watsonx-used": String(diagnostics.watsonxUsed),
     "x-ecohome-rag-local-fallback-used": String(diagnostics.localFallbackUsed),
-    ...(diagnostics.localFallbackReason
+    ...(diagnostics.fallbackReason
       ? {
           "x-ecohome-rag-fallback-reason": compactHeaderValue(
-            diagnostics.localFallbackReason,
+            diagnostics.fallbackReason,
           ),
         }
       : {}),
@@ -54,6 +61,13 @@ export function buildGenerateHomeResponseHeaders({
       ? {
           "x-ecohome-rag-supabase-error": compactHeaderValue(
             diagnostics.supabaseError,
+          ),
+        }
+      : {}),
+    ...(diagnostics.watsonxError
+      ? {
+          "x-ecohome-rag-watsonx-error": compactHeaderValue(
+            diagnostics.watsonxError,
           ),
         }
       : {}),

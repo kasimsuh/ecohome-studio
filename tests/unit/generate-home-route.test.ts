@@ -3,15 +3,27 @@ import { POST } from "@/app/api/generate-home/route";
 describe("POST /api/generate-home", () => {
   const originalApiKey = process.env.FEATHERLESS_API_KEY;
   const originalModel = process.env.FEATHERLESS_MODEL;
+  const originalWatsonxApiKey = process.env.WATSONX_API_KEY;
+  const originalWatsonxProjectId = process.env.WATSONX_PROJECT_ID;
+  const originalWatsonxUrl = process.env.WATSONX_URL;
+  const originalWatsonxVectorIndexId = process.env.WATSONX_VECTOR_INDEX_ID;
 
   afterEach(() => {
     process.env.FEATHERLESS_API_KEY = originalApiKey;
     process.env.FEATHERLESS_MODEL = originalModel;
+    process.env.WATSONX_API_KEY = originalWatsonxApiKey;
+    process.env.WATSONX_PROJECT_ID = originalWatsonxProjectId;
+    process.env.WATSONX_URL = originalWatsonxUrl;
+    process.env.WATSONX_VECTOR_INDEX_ID = originalWatsonxVectorIndexId;
   });
 
   it("returns a structured fallback concept when provider credentials are missing", async () => {
     delete process.env.FEATHERLESS_API_KEY;
     delete process.env.FEATHERLESS_MODEL;
+    delete process.env.WATSONX_API_KEY;
+    delete process.env.WATSONX_PROJECT_ID;
+    delete process.env.WATSONX_URL;
+    delete process.env.WATSONX_VECTOR_INDEX_ID;
 
     const request = new Request("http://localhost/api/generate-home", {
       method: "POST",
@@ -43,6 +55,7 @@ describe("POST /api/generate-home", () => {
     expect(response.headers.get("x-ecohome-provider-error")).toContain(
       "Featherless credentials are not configured",
     );
+    expect(response.headers.get("x-ecohome-rag-watsonx-attempted")).toBe("false");
     expect(response.headers.get("x-ecohome-rag-local-fallback-used")).toBe("true");
   });
 });
