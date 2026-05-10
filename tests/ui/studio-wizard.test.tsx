@@ -5,6 +5,7 @@ import { beforeEach, vi } from "vitest";
 
 import { StudioWizard } from "@/components/studio/studio-wizard";
 import { createGeneratedHomeConcept } from "@/lib/domain/mock-data";
+import { sampleStructuredHomeConcept } from "@/lib/domain/sample-structured-home";
 
 const pushMock = vi.fn();
 
@@ -52,34 +53,8 @@ describe("StudioWizard", () => {
     expect(screen.getByText(/Only JPG, PNG, and WEBP/)).toBeInTheDocument();
   });
 
-  it("submits the flow and stores the generated project", async () => {
+  it("submits the flow through the structured API and stores an adapted project", async () => {
     const user = userEvent.setup();
-    const generatedConcept = createGeneratedHomeConcept(
-      {
-        description:
-          "A light-filled family home with a modern exterior, sustainable materials, and flexible living space.",
-        location: "Toronto, Canada",
-        climateRegion: "cold",
-        budgetLevel: "medium",
-        inspirationImages: [
-          {
-            id: "img-1",
-            name: "warm-wood-modern-home.jpg",
-            type: "image/jpeg",
-            size: 1000
-          }
-        ],
-        styleAnalysis: {
-          aesthetic: "warm organic contemporary",
-          palette: ["oak", "linen", "sage"],
-          materials: ["light timber", "tile"],
-          lighting: ["daylit living"],
-          layoutPatterns: ["garden-facing living"],
-          summary: "Warm organic contemporary inspiration."
-        }
-      },
-      "generated-test"
-    );
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -107,7 +82,13 @@ describe("StudioWizard", () => {
         );
       }
 
-      return new Response(JSON.stringify(generatedConcept));
+      if (url.includes("/api/generate-home")) {
+        return new Response(JSON.stringify(sampleStructuredHomeConcept));
+      }
+
+      return new Response(JSON.stringify({ error: "Unexpected endpoint" }), {
+        status: 404
+      });
     });
 
     vi.stubGlobal("fetch", fetchMock);
@@ -135,11 +116,86 @@ describe("StudioWizard", () => {
     await user.click(screen.getByRole("button", { name: "Generate concept" }));
 
     await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/results/structured-demo");
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/generate-home",
+      expect.objectContaining({
+        method: "POST"
+      })
+    );
+    expect(
+      window.sessionStorage.getItem("ecohome:project:structured-demo")
+    ).toContain("Compact warm modern for Toronto, Canada");
+  });
+
+  it("falls back to the mock concept endpoint when the structured API fails", async () => {
+    const user = userEvent.setup();
+    const generatedConcept = createGeneratedHomeConcept(
+      {
+        description:
+          "A light-filled family home with a modern exterior, sustainable materials, and flexible living space.",
+        location: "Toronto, Canada",
+        climateRegion: "cold",
+        budgetLevel: "medium",
+        inspirationImages: [],
+        styleAnalysis: null
+      },
+      "generated-test"
+    );
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url.includes("/api/generate-home")) {
+        return new Response(JSON.stringify({ error: "Provider failed" }), {
+          status: 500
+        });
+      }
+
+      if (url.includes("/api/generate-concept")) {
+        return new Response(JSON.stringify(generatedConcept));
+      }
+
+      return new Response(
+        JSON.stringify({
+          styleAnalysis: null,
+          inspirationImages: []
+        })
+      );
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<StudioWizard />);
+
+    await user.type(
+      screen.getByLabelText("Dream home brief"),
+      "A light-filled family home with a modern exterior, sustainable materials, and flexible living space."
+    );
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Generate concept" }));
+
+    await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith("/results/generated-test");
     });
 
-    expect(window.sessionStorage.getItem("ecohome:project:generated-test")).toContain(
-      "generated-test"
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/generate-home",
+      expect.objectContaining({
+        method: "POST"
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/generate-concept",
+      expect.objectContaining({
+        method: "POST"
+      })
     );
   });
 });

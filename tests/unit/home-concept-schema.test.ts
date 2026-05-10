@@ -13,7 +13,15 @@ describe("home concept schema", () => {
   });
 
   it("accepts the AI-facing concept payload without metadata", () => {
-    const { projectId, generatedAt, sourcePrompt, inspirationImages, styleAnalysis, guidanceSnippets, ...homeConcept } =
+    const {
+      projectId,
+      generatedAt,
+      sourcePrompt,
+      inspirationImages,
+      styleAnalysis,
+      guidanceSnippets,
+      ...homeConcept
+    } =
       sampleStructuredHomeConcept;
 
     expect(() => homeConceptSchema.parse(homeConcept)).not.toThrow();
@@ -22,6 +30,7 @@ describe("home concept schema", () => {
     expect(inspirationImages).toHaveLength(1);
     expect(styleAnalysis?.aesthetic).toBeTruthy();
     expect(guidanceSnippets).toHaveLength(3);
+    expect(homeConcept.sources).toHaveLength(3);
     expect(generatedAt).toBeTruthy();
   });
 

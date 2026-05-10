@@ -97,7 +97,8 @@ It should not feel like a generic enterprise dashboard.
 - **Next.js**
 - **Tailwind CSS**
 - **Three.js** for future lightweight interactive 3D or richer visual previews
-- **IBM watsonx.ai** for enterprise-grade AI workflows and experimentation
+- **LangChain** for retrieval orchestration
+- **Supabase pgvector** for vector storage and similarity search
 - **Featherless.ai** for open-source model access / language generation
 - a future **vision model** for inspiration image analysis
 - a future **image generation model** for interior / exterior concept visuals
@@ -139,6 +140,11 @@ The repo is currently a **demo-friendly starter** with mocked AI behavior. Plann
   - Validates payload with Zod
   - Calls the AI provider concept-generation capability
 
+- `app/api/generate-home/route.ts`
+  - Accepts the newer structured home-generation payload
+  - Calls the Featherless generation path
+  - Uses the neutral retrieval layer that is being migrated to LangChain + Supabase
+
 ### AI abstraction layer
 
 - `lib/ai/contracts.ts`
@@ -149,6 +155,14 @@ The repo is currently a **demo-friendly starter** with mocked AI behavior. Plann
 
 - `lib/ai/mock-provider.ts`
   - Current mock implementation used by the app
+
+- `lib/ai/featherless.ts`
+  - Structured JSON generation path for the newer home-concept flow
+
+- `lib/rag/retriever.ts`
+  - Neutral retrieval entry point
+  - Temporary seed-doc fallback today
+  - Intended replacement target for LangChain + Supabase pgvector
 
 #### Provider contract
 
@@ -342,6 +356,12 @@ The app currently uses a mock provider:
 - deterministic enough for testing
 - structured enough to swap later
 
+The structured generation path is now centered on:
+
+- **Featherless.ai** for JSON generation
+- a neutral `lib/rag/retriever.ts` layer
+- a planned **LangChain + Supabase pgvector** retrieval stack
+
 ### If adding real providers
 
 Keep these goals:
@@ -357,19 +377,24 @@ Keep these goals:
 From `.env.example`:
 
 - `NEXT_PUBLIC_APP_NAME`
-- `IBM_WATSONX_API_KEY`
-- `IBM_WATSONX_PROJECT_ID`
-- `IBM_WATSONX_URL`
 - `FEATHERLESS_API_KEY`
+- `FEATHERLESS_MODEL`
+- `FEATHERLESS_BASE_URL`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `EMBEDDING_PROVIDER`
+- `EMBEDDING_MODEL`
+- `OPENAI_API_KEY`
 - `IMAGE_MODEL_PROVIDER`
 - `VISION_MODEL_PROVIDER`
 
 ### Sensible future integration path
 
-1. Keep mock provider as fallback.
-2. Add a real provider implementation alongside it.
-3. Switch provider selection in `lib/ai/index.ts`.
-4. Do not let missing provider credentials break the demo experience.
+1. Keep mock provider as fallback for the legacy flow.
+2. Keep Featherless as the structured generation model.
+3. Implement retrieval behind `lib/rag/retriever.ts`.
+4. Use LangChain + Supabase pgvector instead of watsonx.ai.
+5. Do not let missing provider credentials break the demo experience.
 
 ---
 

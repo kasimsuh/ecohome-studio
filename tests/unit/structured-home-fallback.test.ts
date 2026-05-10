@@ -11,23 +11,28 @@ describe("createFallbackStructuredHomeConcept", () => {
         climateRegion: "cold",
         budgetLevel: "medium",
         inspirationImages: [],
-        styleAnalysis: null
+        styleAnalysis: null,
       },
       guidanceSnippets: [
         {
           title: "Cold climate envelope",
           source: "climate-resilience.md",
           content:
-            "Use airtight detailing, continuous insulation, and heat recovery before oversizing mechanical systems."
-        }
-      ]
+            "Use airtight detailing, continuous insulation, and heat recovery before oversizing mechanical systems.",
+        },
+      ],
     });
 
     expect(() => generatedHomeConceptSchema.parse(concept)).not.toThrow();
     expect(concept.location).toBe("Toronto, Canada");
     expect(concept.climateType).toBe("cold");
     expect(concept.guidanceSnippets).toHaveLength(1);
-    expect(concept.floorPlan.rooms.length).toBeGreaterThan(0);
-    expect(concept.model3D.windows.length).toBeGreaterThan(0);
+    expect(concept.sources).toEqual([
+      {
+        title: "Cold climate envelope",
+        source: "climate-resilience.md",
+        filename: "climate-resilience.md",
+      },
+    ]);
   });
 });

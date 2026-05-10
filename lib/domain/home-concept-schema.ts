@@ -60,6 +60,13 @@ export const guidanceSnippetSchema = z.object({
   content: z.string().min(1).max(320)
 });
 
+export const sourceReferenceSchema = z.object({
+  title: z.string().min(1).max(120),
+  source: z.string().min(1).max(160),
+  filename: z.string().min(1).max(160).optional(),
+  page: z.number().int().positive().optional()
+});
+
 export const sustainabilityScoreSchema = z.object({
   total: z.number().min(0).max(100),
   energyEfficiency: z.number().min(0).max(100),
@@ -144,7 +151,8 @@ export const homeConceptSchema = z.object({
   model3D: model3DSchema,
   upgrades: z.array(upgradeSchema).min(1).max(10),
   materials: z.array(materialSchema).min(1).max(8),
-  visualPrompts: visualPromptsSchema
+  visualPrompts: visualPromptsSchema,
+  sources: z.array(sourceReferenceSchema).max(8).default([])
 });
 
 export const generatedHomeConceptSchema = homeConceptSchema.extend({
@@ -169,3 +177,4 @@ export type HomeConcept = z.infer<typeof homeConceptSchema>;
 export type GeneratedHomeConceptPayload = z.infer<typeof generatedHomeConceptSchema>;
 export type GenerateHomeRequest = z.infer<typeof generateHomeRequestSchema>;
 export type GuidanceSnippet = z.infer<typeof guidanceSnippetSchema>;
+export type SourceReference = z.infer<typeof sourceReferenceSchema>;

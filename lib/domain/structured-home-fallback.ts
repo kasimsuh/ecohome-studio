@@ -1,7 +1,8 @@
 import type {
   GenerateHomeRequest,
   GeneratedHomeConceptPayload,
-  GuidanceSnippet
+  GuidanceSnippet,
+  SourceReference
 } from "@/lib/domain/home-concept-schema";
 import { generatedHomeConceptSchema } from "@/lib/domain/home-concept-schema";
 import { sampleStructuredHomeConcept } from "@/lib/domain/sample-structured-home";
@@ -121,6 +122,27 @@ function createVisualPrompts(input: GenerateHomeRequest, style: string) {
   };
 }
 
+function createSourceReferences(
+  guidanceSnippets: GuidanceSnippet[],
+): SourceReference[] {
+  return guidanceSnippets
+    .map((snippet) => ({
+      title: snippet.title,
+      source: snippet.source,
+      filename: snippet.source,
+    }))
+    .filter(
+      (reference, index, references) =>
+        references.findIndex(
+          (candidate) =>
+            candidate.title === reference.title &&
+            candidate.source === reference.source &&
+            candidate.filename === reference.filename,
+        ) === index,
+    )
+    .slice(0, 8);
+}
+
 export function createFallbackStructuredHomeConcept({
   input,
   guidanceSnippets
@@ -144,6 +166,7 @@ export function createFallbackStructuredHomeConcept({
     architecturalStyle: style,
     sustainabilityScore: scores,
     visualPrompts: createVisualPrompts(input, style),
+    sources: createSourceReferences(guidanceSnippets),
     inspirationImages: input.inspirationImages,
     styleAnalysis: input.styleAnalysis,
     guidanceSnippets

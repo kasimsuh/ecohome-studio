@@ -7,15 +7,22 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
+    "rag:ingest": "node --import tsx scripts/ingest-rag-docs.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@langchain/community": "^1.1.28",
+    "@langchain/core": "^1.1.45",
+    "@langchain/openai": "^1.4.5",
+    "@langchain/textsplitters": "^1.0.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "@supabase/supabase-js": "^2.105.4",
     "clsx": "^2.1.1",
     "next": "^15.0.0",
     "openai": "^6.37.0",
+    "pdf-parse": "^2.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.184.0",
@@ -24,6 +31,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@tailwindcss/postcss": "^4.1.5",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^14.6.1",
@@ -34,6 +42,7 @@
     "eslint-config-next": "^15.0.0",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4.1.5",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5"
   }

@@ -246,6 +246,23 @@ export const sampleStructuredHomeConcept = generatedHomeConceptSchema.parse({
     interiorPrompt:
       "Interior rendering of a sustainable Toronto home with reclaimed oak, warm daylight, compact built-in storage, calm neutral textiles, and energy-smart detailing around windows and insulation depth."
   },
+  sources: [
+    {
+      title: "Cold-climate envelope first",
+      source: "climate-resilience.md",
+      filename: "climate-resilience.md"
+    },
+    {
+      title: "Water-smart site strategy",
+      source: "water-efficiency.md",
+      filename: "water-efficiency.md"
+    },
+    {
+      title: "Budget-aware solar readiness",
+      source: "budget-tradeoffs.md",
+      filename: "budget-tradeoffs.md"
+    }
+  ],
   inspirationImages: [
     {
       id: "sample-1",

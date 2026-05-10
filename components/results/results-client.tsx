@@ -6,6 +6,10 @@ import { useEffect, useState } from "react";
 import { ResultsView } from "@/components/results/results-view";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import {
+  adaptStructuredConceptToGeneratedHomeConcept,
+  isStructuredGeneratedHomeConceptPayload
+} from "@/lib/domain/structured-home-adapter";
 import { sampleGeneratedHomeConcept } from "@/lib/domain/sample-project";
 import type { GeneratedHomeConcept } from "@/lib/domain/types";
 import { getProjectStorageKey } from "@/lib/session";
@@ -29,7 +33,13 @@ export function ResultsClient({ projectId }: { projectId: string }) {
     }
 
     try {
-      setProject(JSON.parse(stored) as GeneratedHomeConcept);
+      const parsed = JSON.parse(stored) as unknown;
+
+      if (isStructuredGeneratedHomeConceptPayload(parsed)) {
+        setProject(adaptStructuredConceptToGeneratedHomeConcept(parsed));
+      } else {
+        setProject(parsed as GeneratedHomeConcept);
+      }
     } catch {
       window.sessionStorage.removeItem(getProjectStorageKey(projectId));
     } finally {
