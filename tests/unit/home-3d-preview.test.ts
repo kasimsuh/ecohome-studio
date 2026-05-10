@@ -11,7 +11,16 @@ vi.mock("@react-three/drei", () => ({
   Sky: () => null
 }));
 
-import { getOpeningRenderPlacement } from "@/components/results/home-3d-preview";
+import {
+  getCrossVentilationArrowHeight,
+  getFurniturePlacements,
+  getOpeningRenderPlacement,
+  getRainwaterTankPlacement,
+  getRoofPeakHeight,
+  getTreePlacements,
+  resolveExteriorColor,
+  resolveRoofColor,
+} from "@/components/results/home-3d-preview";
 import { sampleStructuredHomeConcept } from "@/lib/domain/sample-structured-home";
 import type { ModelOpening } from "@/lib/domain/types";
 
@@ -41,5 +50,72 @@ describe("getOpeningRenderPlacement", () => {
       getOpeningRenderPlacement({ ...baseOpening, wall: "west" }, floorPlan, false)
         .position[0],
     ).toBeLessThan(-floorPlan.width / 2);
+  });
+});
+
+describe("3D scene deterministic helpers", () => {
+  it("creates stable but varied tree and rainwater placements", () => {
+    const floorPlan = sampleStructuredHomeConcept.floorPlan;
+
+    expect(getTreePlacements(floorPlan, "seed-a")).toEqual(
+      getTreePlacements(floorPlan, "seed-a"),
+    );
+    expect(getTreePlacements(floorPlan, "seed-a")).not.toEqual(
+      getTreePlacements(floorPlan, "seed-b"),
+    );
+    expect(getRainwaterTankPlacement(floorPlan, "seed-a")).toEqual(
+      getRainwaterTankPlacement(floorPlan, "seed-a"),
+    );
+    expect(getRainwaterTankPlacement(floorPlan, "seed-a")).not.toEqual(
+      getRainwaterTankPlacement(floorPlan, "seed-b"),
+    );
+  });
+
+  it("resolves freeform exterior and roof colors from generated JSON text", () => {
+    expect(resolveExteriorColor("soft beige-green")).toBe("#9dad88");
+    expect(resolveExteriorColor("charcoal cedar")).not.toBe("#dcc8a4");
+    expect(resolveExteriorColor("white lime plaster")).not.toBe("#dcc8a4");
+    expect(resolveExteriorColor("generated color name")).not.toBe("#dcc8a4");
+    expect(
+      resolveRoofColor({
+        ...sampleStructuredHomeConcept.model3D,
+        exteriorColor: "charcoal cedar",
+      }),
+    ).toBe("#34312c");
+  });
+
+  it("places cross ventilation above the highest roof point for each roof type", () => {
+    const floorPlan = sampleStructuredHomeConcept.floorPlan;
+
+    (["flat", "gable", "hip", "shed", "butterfly"] as const).forEach((roofType) => {
+      const model3D = {
+        ...sampleStructuredHomeConcept.model3D,
+        roofType,
+      };
+
+      expect(getCrossVentilationArrowHeight(floorPlan, model3D)).toBeGreaterThan(
+        getRoofPeakHeight(floorPlan, model3D),
+      );
+    });
+  });
+
+  it("creates stable dummy furniture from floor plan room types", () => {
+    const floorPlan = sampleStructuredHomeConcept.floorPlan;
+    const furniture = getFurniturePlacements(floorPlan, "seed-a");
+
+    expect(furniture).toEqual(getFurniturePlacements(floorPlan, "seed-a"));
+    expect(furniture).not.toEqual(getFurniturePlacements(floorPlan, "seed-b"));
+    expect(furniture.map((item) => item.kind)).toEqual(
+      expect.arrayContaining(["sofa", "table", "bed", "desk", "cabinet"]),
+    );
+    expect(
+      furniture.every(
+        (item) =>
+          item.position[0] >= -floorPlan.width / 2 &&
+          item.position[0] <= floorPlan.width / 2 &&
+          item.position[2] >= -floorPlan.height / 2 &&
+          item.position[2] <= floorPlan.height / 2,
+      ),
+    ).toBe(true);
   });
 });

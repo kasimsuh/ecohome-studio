@@ -18,6 +18,7 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
           model3D={project.model3D}
           upgrades={project.upgrades}
           materials={project.materials}
+          sceneSeed={`${project.projectId}:${project.location}:${project.architecturalStyle}`}
           variant="workspace"
         />
       </main>

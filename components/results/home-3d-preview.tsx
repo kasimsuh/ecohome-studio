@@ -14,6 +14,7 @@ import { FloorPlanDrawing } from "@/components/results/floor-plan-2d";
 import { Card, CardTitle } from "@/components/ui/card";
 import type {
   FloorPlan,
+  FloorPlanRoom,
   GeneratedHomeConcept,
   Model3D,
   ModelOpening,
@@ -30,6 +31,16 @@ const WALL_THICKNESS = 0.28;
 const EXTERIOR_REVEAL_DEPTH = 0.05;
 const OPENING_CUTOUT_PADDING = 0.12;
 
+type FurnitureKind = "sofa" | "table" | "bed" | "desk" | "cabinet";
+
+type FurniturePlacement = {
+  kind: FurnitureKind;
+  position: [number, number, number];
+  rotationY: number;
+  scale: [number, number, number];
+  color: string;
+};
+
 const exteriorColorMap: Record<string, string> = {
   "sandstone-beige": "#dcc8a4",
   "warm-white": "#ece6d6",
@@ -43,10 +54,147 @@ const exteriorColorMap: Record<string, string> = {
   beige: "#dcc8a4",
 };
 
-function resolveExteriorColor(value: string) {
-  if (!value) return "#dcc8a4";
+const colorKeywordMap: Array<[string, string]> = [
+  ["charcoal", "#4d4942"],
+  ["black", "#37332d"],
+  ["cedar", "#a17350"],
+  ["timber", "#b1845a"],
+  ["wood", "#a8794f"],
+  ["clay", "#b98464"],
+  ["terracotta", "#b97455"],
+  ["brick", "#a7654e"],
+  ["sage", "#a3ae8d"],
+  ["green", "#9dad88"],
+  ["white", "#f1ece1"],
+  ["lime", "#eee8d8"],
+  ["plaster", "#e8dfcc"],
+  ["taupe", "#b9aa98"],
+  ["stone", "#b9b2a6"],
+  ["grey", "#bcb6ac"],
+  ["gray", "#bcb6ac"],
+  ["beige", "#dcc8a4"],
+  ["sand", "#dcc8a4"]
+];
+
+function hashString(value: string) {
+  let hash = 2166136261;
+
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
+function seededRandom(seed: string) {
+  let state = hashString(seed) || 1;
+
+  return () => {
+    state = Math.imul(state ^ (state >>> 15), 1 | state);
+    state ^= state + Math.imul(state ^ (state >>> 7), 61 | state);
+    return ((state ^ (state >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function stableMutedColor(value: string) {
+  const hue = hashString(value) % 360;
+  return new THREE.Color().setHSL(hue / 360, 0.18, 0.68).getStyle();
+}
+
+function mixColor(color: string, target: string, amount: number) {
+  return new THREE.Color(color).lerp(new THREE.Color(target), amount).getStyle();
+}
+
+export function resolveExteriorColor(value: string, wallMaterial = "") {
+  if (!value && !wallMaterial) return "#dcc8a4";
   const key = value.toLowerCase().trim().replace(/\s+/g, "-");
-  return exteriorColorMap[key] ?? "#dcc8a4";
+  const tokenSource = `${value} ${wallMaterial}`.toLowerCase();
+  const keywordColor = colorKeywordMap.find(([keyword]) =>
+    tokenSource.includes(keyword)
+  )?.[1];
+  const baseColor =
+    exteriorColorMap[key] ?? keywordColor ?? stableMutedColor(tokenSource);
+
+  if (/\b(timber|cedar|wood)\b/.test(tokenSource)) {
+    return mixColor(baseColor, "#b1845a", 0.18);
+  }
+
+  if (/\b(stone|brick|mineral|tile)\b/.test(tokenSource)) {
+    return mixColor(baseColor, "#aaa79e", 0.18);
+  }
+
+  if (/\b(plaster|white|lime)\b/.test(tokenSource)) {
+    return mixColor(baseColor, "#f1ece1", 0.22);
+  }
+
+  return baseColor;
+}
+
+export function resolveRoofColor(model3D: Model3D) {
+  if (model3D.sustainabilityFeatures.greenRoof) {
+    return sustainabilityAccent.greenRoof;
+  }
+
+  const source = `${model3D.exteriorColor} ${model3D.wallMaterial}`.toLowerCase();
+
+  if (source.includes("charcoal") || source.includes("black")) {
+    return "#34312c";
+  }
+
+  if (source.includes("cedar") || source.includes("wood") || source.includes("timber")) {
+    return "#5b4938";
+  }
+
+  if (source.includes("white") || source.includes("lime") || source.includes("plaster")) {
+    return "#8c867a";
+  }
+
+  if (model3D.roofType === "flat") {
+    return "#5d5e51";
+  }
+
+  return "#4a4339";
+}
+
+export function createSceneSeed({
+  architecturalStyle,
+  exteriorColor,
+  location,
+  projectId
+}: {
+  architecturalStyle?: string;
+  exteriorColor: string;
+  location?: string;
+  projectId?: string;
+}) {
+  return [projectId, location, architecturalStyle, exteriorColor]
+    .filter(Boolean)
+    .join(":");
+}
+
+export function getRoofPeakHeight(floorPlan: FloorPlan, model3D: Model3D) {
+  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
+  const roofWidth = floorPlan.width + ROOF_OVERHANG * 2;
+  const roofDepth = floorPlan.height + ROOF_OVERHANG * 2;
+
+  if (model3D.roofType === "gable") {
+    return top + roofDepth * 0.38;
+  }
+
+  if (model3D.roofType === "hip") {
+    return top + Math.min(roofWidth, roofDepth) * 0.32;
+  }
+
+  if (model3D.roofType === "shed") {
+    return top + roofWidth * 0.18;
+  }
+
+  if (model3D.roofType === "butterfly") {
+    return top + roofWidth * 0.1;
+  }
+
+  return top + 0.48;
 }
 
 const sustainabilityAccent: Record<
@@ -247,7 +395,7 @@ function WallsWithOpenings({
   floorPlan: FloorPlan;
   model3D: Model3D;
 }) {
-  const color = resolveExteriorColor(model3D.exteriorColor);
+  const color = resolveExteriorColor(model3D.exteriorColor, model3D.wallMaterial);
   const T = WALL_THICKNESS;
   const fW = floorPlan.width;
   const fH = floorPlan.height;
@@ -406,14 +554,16 @@ function FlatRoof({
   floorPlan,
   top,
   greenRoof,
+  roofColor,
 }: {
   floorPlan: FloorPlan;
   top: number;
   greenRoof: boolean;
+  roofColor: string;
 }) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
-  const surface = greenRoof ? sustainabilityAccent.greenRoof : "#5d5e51";
+  const surface = greenRoof ? sustainabilityAccent.greenRoof : roofColor;
 
   return (
     <group position={[0, top, 0]}>
@@ -446,7 +596,15 @@ function FlatRoof({
   );
 }
 
-function GableRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
+function GableRoof({
+  floorPlan,
+  top,
+  roofColor,
+}: {
+  floorPlan: FloorPlan;
+  top: number;
+  roofColor: string;
+}) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
   // Peak proportional to depth so slope reads on the south face
@@ -475,7 +633,7 @@ function GableRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
         receiveShadow
       >
         <extrudeGeometry args={[shape, { depth: w, bevelEnabled: false }]} />
-        <meshStandardMaterial color="#4a4339" roughness={0.92} />
+        <meshStandardMaterial color={roofColor} roughness={0.92} />
       </mesh>
       {/* Ridge cap beam running east-west */}
       <mesh position={[0, peak + 0.05, 0]} castShadow>
@@ -495,7 +653,15 @@ function GableRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
   );
 }
 
-function HipRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
+function HipRoof({
+  floorPlan,
+  top,
+  roofColor,
+}: {
+  floorPlan: FloorPlan;
+  top: number;
+  roofColor: string;
+}) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
   const peak = Math.min(w, d) * 0.32;
@@ -534,7 +700,7 @@ function HipRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
     <group position={[0, top, 0]}>
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshStandardMaterial
-          color="#4a4339"
+          color={roofColor}
           side={THREE.DoubleSide}
           roughness={0.92}
         />
@@ -560,7 +726,15 @@ function HipRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
   );
 }
 
-function ShedRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
+function ShedRoof({
+  floorPlan,
+  top,
+  roofColor,
+}: {
+  floorPlan: FloorPlan;
+  top: number;
+  roofColor: string;
+}) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
   const rise = w * 0.18;
@@ -570,7 +744,7 @@ function ShedRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
     <group position={[0, top, 0]} rotation={[0, 0, angle]}>
       <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
         <boxGeometry args={[w / Math.cos(angle), 0.2, d]} />
-        <meshStandardMaterial color="#4a4339" roughness={0.92} />
+        <meshStandardMaterial color={roofColor} roughness={0.92} />
       </mesh>
     </group>
   );
@@ -579,9 +753,11 @@ function ShedRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
 function ButterflyRoof({
   floorPlan,
   top,
+  roofColor,
 }: {
   floorPlan: FloorPlan;
   top: number;
+  roofColor: string;
 }) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const halfW = w / 2;
@@ -594,13 +770,13 @@ function ButterflyRoof({
       <group position={[-halfW / 2, 0, 0]} rotation={[0, 0, -angle]}>
         <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
           <boxGeometry args={[halfW / Math.cos(angle), 0.18, d]} />
-          <meshStandardMaterial color="#4a4339" roughness={0.92} />
+          <meshStandardMaterial color={roofColor} roughness={0.92} />
         </mesh>
       </group>
       <group position={[halfW / 2, 0, 0]} rotation={[0, 0, angle]}>
         <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
           <boxGeometry args={[halfW / Math.cos(angle), 0.18, d]} />
-          <meshStandardMaterial color="#4a4339" roughness={0.92} />
+          <meshStandardMaterial color={roofColor} roughness={0.92} />
         </mesh>
       </group>
     </group>
@@ -617,13 +793,27 @@ function Roof({
   const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
   const greenRoof = model3D.sustainabilityFeatures.greenRoof;
   const type: RoofType = model3D.roofType;
+  const roofColor = resolveRoofColor(model3D);
 
-  if (type === "gable") return <GableRoof floorPlan={floorPlan} top={top} />;
-  if (type === "hip") return <HipRoof floorPlan={floorPlan} top={top} />;
-  if (type === "shed") return <ShedRoof floorPlan={floorPlan} top={top} />;
+  if (type === "gable") {
+    return <GableRoof floorPlan={floorPlan} top={top} roofColor={roofColor} />;
+  }
+  if (type === "hip") {
+    return <HipRoof floorPlan={floorPlan} top={top} roofColor={roofColor} />;
+  }
+  if (type === "shed") {
+    return <ShedRoof floorPlan={floorPlan} top={top} roofColor={roofColor} />;
+  }
   if (type === "butterfly")
-    return <ButterflyRoof floorPlan={floorPlan} top={top} />;
-  return <FlatRoof floorPlan={floorPlan} top={top} greenRoof={greenRoof} />;
+    return <ButterflyRoof floorPlan={floorPlan} top={top} roofColor={roofColor} />;
+  return (
+    <FlatRoof
+      floorPlan={floorPlan}
+      top={top}
+      greenRoof={greenRoof}
+      roofColor={roofColor}
+    />
+  );
 }
 
 function SolarArray({
@@ -704,15 +894,39 @@ function SolarArray({
   );
 }
 
-function RainwaterTank({ floorPlan }: { floorPlan: FloorPlan }) {
+export function getRainwaterTankPlacement(floorPlan: FloorPlan, sceneSeed: string) {
+  const random = seededRandom(`${sceneSeed}:rainwater`);
+  const options: Array<[number, number]> = [
+    [floorPlan.width / 2 + 1.0, floorPlan.height / 2 - 1.6],
+    [floorPlan.width / 2 + 1.2, -floorPlan.height / 2 + 1.3],
+    [-floorPlan.width / 2 - 1.1, floorPlan.height / 2 - 1.4],
+    [-floorPlan.width / 2 - 1.2, -floorPlan.height / 2 + 1.1],
+  ];
+  const [x, z] = options[Math.floor(random() * options.length)] ?? options[0];
+
+  return {
+    position: [
+      x + (random() - 0.5) * 0.45,
+      FOUNDATION_HEIGHT + 0.75,
+      z + (random() - 0.5) * 0.45,
+    ] as [number, number, number],
+  };
+}
+
+function RainwaterTank({
+  floorPlan,
+  sceneSeed,
+}: {
+  floorPlan: FloorPlan;
+  sceneSeed: string;
+}) {
+  const placement = useMemo(
+    () => getRainwaterTankPlacement(floorPlan, sceneSeed),
+    [floorPlan, sceneSeed],
+  );
+
   return (
-    <group
-      position={[
-        floorPlan.width / 2 + 1.0,
-        FOUNDATION_HEIGHT + 0.75,
-        floorPlan.height / 2 - 1.6,
-      ]}
-    >
+    <group position={placement.position}>
       <mesh castShadow>
         <cylinderGeometry args={[0.42, 0.42, 1.5, 28]} />
         <meshStandardMaterial
@@ -779,6 +993,169 @@ function PermeableDriveway({ floorPlan }: { floorPlan: FloorPlan }) {
   );
 }
 
+function roomCenter(room: FloorPlanRoom, floorPlan: FloorPlan): [number, number, number] {
+  return [
+    room.x + room.width / 2 - floorPlan.width / 2,
+    FOUNDATION_HEIGHT + room.floor * FLOOR_HEIGHT + 0.08,
+    room.y + room.height / 2 - floorPlan.height / 2,
+  ];
+}
+
+function roomRotation(room: FloorPlanRoom) {
+  return room.width >= room.height ? 0 : Math.PI / 2;
+}
+
+export function getFurniturePlacements(floorPlan: FloorPlan, sceneSeed: string) {
+  const random = seededRandom(`${sceneSeed}:furniture`);
+  const placements: FurniturePlacement[] = [];
+
+  floorPlan.rooms
+    .filter((room) => room.type !== "outdoor" && room.type !== "circulation")
+    .slice(0, 18)
+    .forEach((room, index) => {
+      const [x, y, z] = roomCenter(room, floorPlan);
+      const rotationY = roomRotation(room);
+      const jitterX = (random() - 0.5) * Math.min(room.width * 0.12, 0.45);
+      const jitterZ = (random() - 0.5) * Math.min(room.height * 0.12, 0.45);
+      const roomScale = Math.min(room.width, room.height);
+
+      if (room.type === "social") {
+        placements.push({
+          kind: "sofa",
+          position: [x + jitterX, y + 0.18, z - Math.min(room.height * 0.16, 0.6) + jitterZ],
+          rotationY,
+          scale: [Math.min(room.width * 0.28, 1.9), 0.42, 0.55],
+          color: index % 2 === 0 ? "#8f9f7a" : "#9a7b62",
+        });
+        placements.push({
+          kind: "table",
+          position: [x - jitterX * 0.5, y + 0.16, z + Math.min(room.height * 0.12, 0.45)],
+          rotationY,
+          scale: [Math.min(room.width * 0.18, 1.1), 0.24, 0.55],
+          color: "#9b7655",
+        });
+      } else if (room.type === "private") {
+        placements.push({
+          kind: "bed",
+          position: [x + jitterX, y + 0.24, z + jitterZ],
+          rotationY,
+          scale: [Math.min(room.width * 0.34, 1.8), 0.34, Math.min(room.height * 0.34, 1.7)],
+          color: "#d8c7a7",
+        });
+      } else if (room.type === "work") {
+        placements.push({
+          kind: "desk",
+          position: [x + jitterX, y + 0.2, z + jitterZ],
+          rotationY,
+          scale: [Math.min(room.width * 0.34, 1.4), 0.34, 0.55],
+          color: "#8ba7a8",
+        });
+      } else if (room.type === "service") {
+        placements.push({
+          kind: "cabinet",
+          position: [x + jitterX, y + 0.28, z + jitterZ],
+          rotationY,
+          scale: [Math.min(room.width * 0.38, 1.6), 0.56, Math.max(0.35, roomScale * 0.16)],
+          color: "#b7aea2",
+        });
+      }
+    });
+
+  return placements;
+}
+
+function FurnitureItem({ item }: { item: FurniturePlacement }) {
+  if (item.kind === "sofa") {
+    return (
+      <group position={item.position} rotation={[0, item.rotationY, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={item.scale} />
+          <meshStandardMaterial color={item.color} roughness={0.78} />
+        </mesh>
+        <mesh position={[0, item.scale[1] * 0.55, -item.scale[2] * 0.45]} castShadow>
+          <boxGeometry args={[item.scale[0], item.scale[1] * 0.85, item.scale[2] * 0.18]} />
+          <meshStandardMaterial color={mixColor(item.color, "#4f5a45", 0.16)} roughness={0.82} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (item.kind === "table") {
+    return (
+      <group position={item.position} rotation={[0, item.rotationY, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={item.scale} />
+          <meshStandardMaterial color={item.color} roughness={0.74} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (item.kind === "bed") {
+    return (
+      <group position={item.position} rotation={[0, item.rotationY, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={item.scale} />
+          <meshStandardMaterial color={item.color} roughness={0.85} />
+        </mesh>
+        <mesh position={[0, item.scale[1] * 0.55, -item.scale[2] * 0.32]} castShadow>
+          <boxGeometry args={[item.scale[0] * 0.82, item.scale[1] * 0.35, item.scale[2] * 0.24]} />
+          <meshStandardMaterial color="#eee8d8" roughness={0.9} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (item.kind === "desk") {
+    return (
+      <group position={item.position} rotation={[0, item.rotationY, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={item.scale} />
+          <meshStandardMaterial color={item.color} roughness={0.72} />
+        </mesh>
+        <mesh position={[item.scale[0] * 0.38, -item.scale[1] * 0.8, 0]} castShadow>
+          <boxGeometry args={[0.16, item.scale[1] * 1.6, item.scale[2] * 0.7]} />
+          <meshStandardMaterial color="#6b6258" roughness={0.88} />
+        </mesh>
+      </group>
+    );
+  }
+
+  return (
+    <group position={item.position} rotation={[0, item.rotationY, 0]}>
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={item.scale} />
+        <meshStandardMaterial color={item.color} roughness={0.86} />
+      </mesh>
+      <mesh position={[0, item.scale[1] * 0.52, 0]} castShadow>
+        <boxGeometry args={[item.scale[0] * 0.92, item.scale[1] * 0.1, item.scale[2] * 0.92]} />
+        <meshStandardMaterial color="#d4cab8" roughness={0.8} />
+      </mesh>
+    </group>
+  );
+}
+
+function InteriorFurniture({
+  floorPlan,
+  sceneSeed,
+}: {
+  floorPlan: FloorPlan;
+  sceneSeed: string;
+}) {
+  const furniture = useMemo(
+    () => getFurniturePlacements(floorPlan, sceneSeed),
+    [floorPlan, sceneSeed],
+  );
+
+  return (
+    <>
+      {furniture.map((item, index) => (
+        <FurnitureItem key={`furniture-${index}`} item={item} />
+      ))}
+    </>
+  );
+}
+
 function CrossVentilationArrows({
   floorPlan,
   model3D,
@@ -786,11 +1163,8 @@ function CrossVentilationArrows({
   floorPlan: FloorPlan;
   model3D: Model3D;
 }) {
-  // Float above the gable ridge so the arrows are always visible
-  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
-  const roofD = floorPlan.height + ROOF_OVERHANG * 2;
-  const gablePeak = model3D.roofType === "gable" ? roofD * 0.38 : 0.5;
-  const y = top + gablePeak + 1.2;
+  // Float above the true roof peak so the arrows are always visible.
+  const y = getCrossVentilationArrowHeight(floorPlan, model3D);
   const span = floorPlan.width + 3;
 
   return (
@@ -832,19 +1206,63 @@ function CrossVentilationArrows({
   );
 }
 
-function Trees({ floorPlan }: { floorPlan: FloorPlan }) {
-  const positions: Array<[number, number, number, number]> = [
-    [-floorPlan.width / 2 - 1.6, -floorPlan.height / 2 - 1.0, 0.95, 1],
-    [-floorPlan.width / 2 - 2.4, -floorPlan.height / 2 + 1.4, 1.15, 0.88],
-    [floorPlan.width / 2 + 1.4, -floorPlan.height / 2 + 0.4, 0.85, 1.05],
-    [floorPlan.width / 2 + 2.2, floorPlan.height / 2 + 0.6, 1.05, 0.92],
-    [-floorPlan.width / 2 - 1.0, floorPlan.height / 2 + 1.6, 1.0, 1],
-    [floorPlan.width / 2 + 1.6, -floorPlan.height / 2 - 1.7, 0.78, 0.95],
+export function getCrossVentilationArrowHeight(floorPlan: FloorPlan, model3D: Model3D) {
+  return getRoofPeakHeight(floorPlan, model3D) + 1.2;
+}
+
+export function getTreePlacements(floorPlan: FloorPlan, sceneSeed: string) {
+  const random = seededRandom(`${sceneSeed}:trees`);
+  const count = 4 + Math.floor(random() * 4);
+  const zones: Array<() => [number, number]> = [
+    () => [
+      -floorPlan.width / 2 - (1.1 + random() * 1.7),
+      -floorPlan.height / 2 - (0.8 + random() * 1.4),
+    ],
+    () => [
+      -floorPlan.width / 2 - (1.2 + random() * 1.9),
+      -floorPlan.height / 2 + random() * floorPlan.height,
+    ],
+    () => [
+      floorPlan.width / 2 + (1.1 + random() * 1.7),
+      -floorPlan.height / 2 + random() * floorPlan.height,
+    ],
+    () => [
+      -floorPlan.width / 2 + random() * floorPlan.width,
+      floorPlan.height / 2 + (1.0 + random() * 1.5),
+    ],
+    () => [
+      floorPlan.width / 2 + (1.1 + random() * 1.8),
+      floorPlan.height / 2 - random() * 2.6,
+    ],
   ];
+
+  return Array.from({ length: count }).map((_, index) => {
+    const [x, z] = zones[index % zones.length]();
+
+    return {
+      x,
+      z,
+      scale: 0.78 + random() * 0.42,
+      hue: 0.85 + random() * 0.35,
+    };
+  });
+}
+
+function Trees({
+  floorPlan,
+  sceneSeed,
+}: {
+  floorPlan: FloorPlan;
+  sceneSeed: string;
+}) {
+  const positions = useMemo(
+    () => getTreePlacements(floorPlan, sceneSeed),
+    [floorPlan, sceneSeed],
+  );
 
   return (
     <>
-      {positions.map(([x, z, scale, hue], i) => {
+      {positions.map(({ x, z, scale, hue }, i) => {
         const dark = hue > 1 ? "#4a7a40" : "#5b8a4d";
         const mid = hue > 1 ? "#5b8a4d" : "#6e9a58";
         const light = "#79a861";
@@ -957,9 +1375,11 @@ function EntryCanopy({
 function HomeScene({
   floorPlan,
   model3D,
+  sceneSeed,
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
+  sceneSeed: string;
 }) {
   const features = model3D.sustainabilityFeatures;
 
@@ -1008,19 +1428,22 @@ function HomeScene({
       {model3D.doors.map((d, i) => (
         <Door key={`door-${i}`} opening={d} floorPlan={floorPlan} />
       ))}
+      <InteriorFurniture floorPlan={floorPlan} sceneSeed={sceneSeed} />
       <EntryCanopy floorPlan={floorPlan} model3D={model3D} />
 
       {features.solarPanels ? (
         <SolarArray floorPlan={floorPlan} model3D={model3D} />
       ) : null}
-      {features.rainwaterTank ? <RainwaterTank floorPlan={floorPlan} /> : null}
+      {features.rainwaterTank ? (
+        <RainwaterTank floorPlan={floorPlan} sceneSeed={sceneSeed} />
+      ) : null}
       {features.permeableDriveway ? (
         <PermeableDriveway floorPlan={floorPlan} />
       ) : null}
       {features.crossVentilation ? (
         <CrossVentilationArrows floorPlan={floorPlan} model3D={model3D} />
       ) : null}
-      {features.trees ? <Trees floorPlan={floorPlan} /> : null}
+      {features.trees ? <Trees floorPlan={floorPlan} sceneSeed={sceneSeed} /> : null}
 
       <OrbitControls
         makeDefault
@@ -1106,6 +1529,7 @@ export function Home3DPreview({
   model3D,
   upgrades,
   materials,
+  sceneSeed,
   className,
   variant = "card",
 }: {
@@ -1113,6 +1537,7 @@ export function Home3DPreview({
   model3D: Model3D;
   upgrades?: GeneratedHomeConcept["upgrades"];
   materials?: GeneratedHomeConcept["materials"];
+  sceneSeed?: string;
   className?: string;
   variant?: "card" | "workspace";
 }) {
@@ -1141,6 +1566,8 @@ export function Home3DPreview({
   );
 
   const cameraDistance = Math.max(floorPlan.width, floorPlan.height) * 1.65;
+  const resolvedSceneSeed =
+    sceneSeed || createSceneSeed({ exteriorColor: model3D.exteriorColor });
 
   if (variant === "workspace") {
     return (
@@ -1158,7 +1585,11 @@ export function Home3DPreview({
               fov: 50,
             }}
           >
-            <HomeScene floorPlan={floorPlan} model3D={model3D} />
+            <HomeScene
+              floorPlan={floorPlan}
+              model3D={model3D}
+              sceneSeed={resolvedSceneSeed}
+            />
           </Canvas>
         </div>
 
@@ -1325,7 +1756,11 @@ export function Home3DPreview({
               fov: 32,
             }}
           >
-            <HomeScene floorPlan={floorPlan} model3D={model3D} />
+            <HomeScene
+              floorPlan={floorPlan}
+              model3D={model3D}
+              sceneSeed={resolvedSceneSeed}
+            />
           </Canvas>
 
           {showFloorPlan ? (
