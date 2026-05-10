@@ -33,6 +33,8 @@ describe("mockSustainableHomeAiProvider", () => {
     expect(concept.sustainabilityUpgrades).toHaveLength(5);
     expect(concept.visualPrompts).toHaveLength(3);
     expect(concept.sustainabilityScore.total).toBeGreaterThan(70);
+    expect(concept.floorPlan?.rooms.length).toBeGreaterThan(0);
+    expect(concept.model3D?.windows.length).toBeGreaterThan(0);
   });
 
   it("analyzes inspiration images into a style summary", async () => {

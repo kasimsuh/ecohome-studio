@@ -2,9 +2,12 @@ import { budgetLabels, climateLabels } from "@/lib/domain/constants";
 import type {
   BudgetLevel,
   ClimateRegion,
+  FloorPlan,
   DreamHomeInput,
   GeneratedHomeConcept,
+  Model3D,
   InspirationImage,
+  RoofType,
   Recommendation,
   StyleAnalysis,
   SustainabilityScore
@@ -431,6 +434,300 @@ function createVisualPrompts(
   ];
 }
 
+function createFloorPlan(input: DreamHomeInput): FloorPlan {
+  const compactBrief = input.description.toLowerCase().includes("compact");
+  const familyBrief =
+    input.description.toLowerCase().includes("family") ||
+    input.description.toLowerCase().includes("kids") ||
+    input.description.toLowerCase().includes("guest");
+
+  const width = compactBrief ? 16 : 18;
+  const height = input.climateRegion === "hot-arid" ? 13 : 12;
+
+  const groundFloorRooms = [
+    {
+      name: "Living Room",
+      x: 0,
+      y: 0,
+      width: 7.5,
+      height: 5,
+      floor: 0,
+      type: "social" as const
+    },
+    {
+      name: "Kitchen + Dining",
+      x: 7.5,
+      y: 0,
+      width: width - 7.5,
+      height: 5,
+      floor: 0,
+      type: "social" as const
+    },
+    {
+      name: "Flex Office",
+      x: 0,
+      y: 5,
+      width: 5,
+      height: 3.5,
+      floor: 0,
+      type: "work" as const
+    },
+    {
+      name: "Bath",
+      x: 5,
+      y: 5,
+      width: 3,
+      height: 3.5,
+      floor: 0,
+      type: "service" as const
+    },
+    {
+      name: "Entry + Mudroom",
+      x: 8,
+      y: 5,
+      width: 4,
+      height: 3.5,
+      floor: 0,
+      type: "circulation" as const
+    },
+    {
+      name: "Utility",
+      x: 12,
+      y: 5,
+      width: width - 12,
+      height: 3.5,
+      floor: 0,
+      type: "service" as const
+    },
+    {
+      name: "Covered Terrace",
+      x: 0,
+      y: 8.5,
+      width,
+      height: 3.5,
+      floor: 0,
+      type: "outdoor" as const
+    }
+  ];
+
+  const upperFloorRooms = familyBrief
+    ? [
+        {
+          name: "Primary Suite",
+          x: 0,
+          y: 0,
+          width: 8,
+          height: 5,
+          floor: 1,
+          type: "private" as const
+        },
+        {
+          name: "Bedroom 2",
+          x: 8,
+          y: 0,
+          width: 5,
+          height: 5,
+          floor: 1,
+          type: "private" as const
+        },
+        {
+          name: "Bedroom 3",
+          x: 13,
+          y: 0,
+          width: width - 13,
+          height: 5,
+          floor: 1,
+          type: "private" as const
+        },
+        {
+          name: "Family Loft",
+          x: 0,
+          y: 5,
+          width: 8,
+          height: 3.5,
+          floor: 1,
+          type: "social" as const
+        },
+        {
+          name: "Shared Bath",
+          x: 8,
+          y: 5,
+          width: 4,
+          height: 3.5,
+          floor: 1,
+          type: "service" as const
+        },
+        {
+          name: "Laundry",
+          x: 12,
+          y: 5,
+          width: 2,
+          height: 3.5,
+          floor: 1,
+          type: "service" as const
+        },
+        {
+          name: "Landing",
+          x: 14,
+          y: 5,
+          width: width - 14,
+          height: 3.5,
+          floor: 1,
+          type: "circulation" as const
+        }
+      ]
+    : [
+        {
+          name: "Primary Suite",
+          x: 0,
+          y: 0,
+          width: 8,
+          height: 5,
+          floor: 1,
+          type: "private" as const
+        },
+        {
+          name: "Flexible Room",
+          x: 8,
+          y: 0,
+          width: width - 8,
+          height: 5,
+          floor: 1,
+          type: "work" as const
+        },
+        {
+          name: "Shared Bath",
+          x: 0,
+          y: 5,
+          width: 4.5,
+          height: 3.5,
+          floor: 1,
+          type: "service" as const
+        },
+        {
+          name: "Study Loft",
+          x: 4.5,
+          y: 5,
+          width: width - 4.5,
+          height: 3.5,
+          floor: 1,
+          type: "social" as const
+        }
+      ];
+
+  return {
+    width,
+    height,
+    rooms: [...groundFloorRooms, ...upperFloorRooms]
+  };
+}
+
+function createModel3D(input: DreamHomeInput, styleAnalysis?: StyleAnalysis | null): Model3D {
+  const roofTypeByClimate: Record<ClimateRegion, RoofType> = {
+    "hot-arid": "shed",
+    temperate: "gable",
+    cold: "gable",
+    tropical: "hip",
+    "flood-prone": "hip"
+  };
+
+  const wallMaterial = styleAnalysis?.materials[0]
+    ? `${styleAnalysis.materials[0]} low-carbon wall assembly`
+    : input.climateRegion === "cold"
+      ? "Timber-framed wall assembly with cellulose insulation"
+      : "Low-carbon timber and mineral-based wall assembly";
+
+  const exteriorColorByClimate: Record<ClimateRegion, string> = {
+    "hot-arid": "warm mineral white",
+    temperate: "sage stone",
+    cold: "sandstone beige",
+    tropical: "soft shell white",
+    "flood-prone": "weathered taupe"
+  };
+
+  const windows: Model3D["windows"] = [
+    { wall: "south", offset: 0.18, width: 1.8, height: 1.5, floor: 0 },
+    { wall: "south", offset: 0.52, width: 2.1, height: 1.6, floor: 0 },
+    { wall: "north", offset: 0.32, width: 1.4, height: 1.2, floor: 0 }
+  ];
+
+  if (input.climateRegion !== "hot-arid") {
+    windows.push(
+      { wall: "east", offset: 0.28, width: 1.2, height: 1.2, floor: 0 },
+      { wall: "west", offset: 0.28, width: 1.2, height: 1.2, floor: 0 }
+    );
+  }
+
+  if (input.description.toLowerCase().includes("family") || input.budgetLevel !== "low") {
+    windows.push(
+      { wall: "south", offset: 0.22, width: 1.5, height: 1.3, floor: 1 },
+      { wall: "south", offset: 0.58, width: 1.5, height: 1.3, floor: 1 }
+    );
+  }
+
+  const doors: Model3D["doors"] = [
+    { wall: "south", offset: 0.12, width: 1.1, height: 2.2, floor: 0 }
+  ];
+
+  if (input.climateRegion !== "hot-arid") {
+    doors.push({ wall: "south", offset: 0.72, width: 1.8, height: 2.3, floor: 0 });
+  }
+
+  return {
+    floors: 2,
+    roofType: roofTypeByClimate[input.climateRegion],
+    wallMaterial,
+    exteriorColor: exteriorColorByClimate[input.climateRegion],
+    windows,
+    doors,
+    sustainabilityFeatures: {
+      solarPanels: input.budgetLevel !== "low",
+      greenRoof: input.climateRegion === "tropical" || input.budgetLevel === "premium",
+      rainwaterTank:
+        input.climateRegion === "hot-arid" ||
+        input.climateRegion === "flood-prone" ||
+        input.budgetLevel !== "low",
+      trees: true,
+      permeableDriveway: input.climateRegion !== "cold",
+      crossVentilation: input.climateRegion !== "cold" || input.budgetLevel === "premium"
+    }
+  };
+}
+
+function createStructuredMaterials(styleAnalysis?: StyleAnalysis | null) {
+  const firstMaterial = styleAnalysis?.materials[0] ?? "reclaimed timber";
+  const secondMaterial = styleAnalysis?.materials[1] ?? "low-carbon tile";
+  const thirdMaterial = styleAnalysis?.materials[2] ?? "mineral plaster";
+
+  return [
+    {
+      name: `${firstMaterial} envelope`,
+      reason: "Keeps the palette visually grounded while reducing embodied carbon pressure.",
+      sustainabilityBenefit: "Supports a lower-impact exterior and interior language."
+    },
+    {
+      name: `${secondMaterial} finishes`,
+      reason: "Works well for high-touch surfaces and keeps maintenance simple over time.",
+      sustainabilityBenefit: "Extends the life of common-use surfaces."
+    },
+    {
+      name: `${thirdMaterial} detailing`,
+      reason: "Adds depth to the concept without relying on resource-heavy decorative layers.",
+      sustainabilityBenefit: "Helps preserve durability while keeping the visual tone calm."
+    }
+  ];
+}
+
+function createStructuredUpgrades(recommendations: Recommendation[]) {
+  return recommendations.map((upgrade) => ({
+    title: upgrade.title,
+    category: upgrade.category,
+    impactLevel: upgrade.impact,
+    explanation: upgrade.rationale,
+    estimatedBenefit: upgrade.estimatedSavings
+  }));
+}
+
 export function createInspirationImageRecord(file: Pick<File, "name" | "type" | "size">): InspirationImage {
   return {
     id: `${file.name}-${file.size}`,
@@ -479,6 +776,13 @@ export function createGeneratedHomeConcept(
 ): GeneratedHomeConcept {
   const climateContent = climateSpecificContent[input.climateRegion];
   const style = inferArchitecturalStyle(input.description, input.styleAnalysis);
+  const floorPlan = createFloorPlan(input);
+  const model3D = createModel3D(input, input.styleAnalysis);
+  const recommendations = createRecommendations(
+    input.climateRegion,
+    input.budgetLevel,
+    input.styleAnalysis
+  );
   const summary = `This concept translates the user's brief into a ${style.toLowerCase()} home for ${input.location}, combining ${climateLabels[input.climateRegion].toLowerCase()} strategies with ${budgetLabels[input.budgetLevel].toLowerCase()} decision-making.`;
 
   return {
@@ -492,11 +796,7 @@ export function createGeneratedHomeConcept(
       "Layer natural materials, washable finishes, and daylight-friendly layouts to keep the interior calm and durable.",
       "Use built-in storage, cross-ventilated rooms, and adaptable furniture zones so the home stays efficient as needs change."
     ],
-    sustainabilityUpgrades: createRecommendations(
-      input.climateRegion,
-      input.budgetLevel,
-      input.styleAnalysis
-    ),
+    sustainabilityUpgrades: recommendations,
     floorPlanIdeas: climateContent.floorPlanIdeas,
     sustainabilityScore: createScore(input.climateRegion, input.budgetLevel),
     environmentalImpact: climateContent.impact,
@@ -509,6 +809,10 @@ export function createGeneratedHomeConcept(
       input.styleAnalysis
     ),
     styleAnalysis: input.styleAnalysis,
+    floorPlan,
+    model3D,
+    materials: createStructuredMaterials(input.styleAnalysis),
+    upgrades: createStructuredUpgrades(recommendations),
     location: input.location,
     climateRegion: input.climateRegion,
     budgetLevel: input.budgetLevel,

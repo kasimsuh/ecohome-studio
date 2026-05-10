@@ -27,5 +27,7 @@ describe("createFallbackStructuredHomeConcept", () => {
     expect(concept.location).toBe("Toronto, Canada");
     expect(concept.climateType).toBe("cold");
     expect(concept.guidanceSnippets).toHaveLength(1);
+    expect(concept.floorPlan.rooms.length).toBeGreaterThan(0);
+    expect(concept.model3D.windows.length).toBeGreaterThan(0);
   });
 });

@@ -203,24 +203,51 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
       </section>
 
       <section className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
-        <Card className="p-6">
-          <CardTitle>Design principles</CardTitle>
-          <ul className="mt-4 space-y-3 leading-7 text-[color:var(--foreground)]">
-            {project.designPrinciples.map((principle) => (
-              <li key={principle}>{principle}</li>
-            ))}
-          </ul>
-          {project.styleAnalysis ? (
-            <div className="mt-6 rounded-[1.5rem] bg-[color:var(--surface-muted)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                Inspiration analysis
-              </p>
-              <p className="mt-3 leading-7 text-[color:var(--foreground)]">
-                {project.styleAnalysis.summary}
-              </p>
-            </div>
-          ) : null}
-        </Card>
+          <Card className="p-6">
+            <CardTitle>Design principles</CardTitle>
+            <ul className="mt-4 space-y-3 leading-7 text-[color:var(--foreground)]">
+              {project.designPrinciples.map((principle) => (
+                <li key={principle}>{principle}</li>
+              ))}
+            </ul>
+            {project.styleAnalysis ? (
+              <div className="mt-6 rounded-[1.5rem] bg-[color:var(--surface-muted)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  Inspiration analysis
+                </p>
+                <p className="mt-3 leading-7 text-[color:var(--foreground)]">
+                  {project.styleAnalysis.summary}
+                </p>
+              </div>
+            ) : null}
+            {project.floorPlan || project.model3D ? (
+              <div className="mt-6 rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  3D model inputs
+                </p>
+                <div className="mt-3 grid gap-3 text-sm leading-6 text-[color:var(--foreground)]">
+                  {project.floorPlan ? (
+                    <p>
+                      Floor plan: {project.floorPlan.rooms.length} rooms across{" "}
+                      {project.floorPlan.width} x {project.floorPlan.height}
+                    </p>
+                  ) : null}
+                  {project.model3D ? (
+                    <>
+                      <p>Floors: {project.model3D.floors}</p>
+                      <p>Roof type: {project.model3D.roofType}</p>
+                      <p>Wall material: {project.model3D.wallMaterial}</p>
+                      <p>Exterior color: {project.model3D.exteriorColor}</p>
+                      <p>
+                        Openings: {project.model3D.windows.length} windows,{" "}
+                        {project.model3D.doors.length} doors
+                      </p>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </Card>
 
         <Card className="p-6">
           <CardTitle>Visual prompt starters</CardTitle>
