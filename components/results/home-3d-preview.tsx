@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 
+import { FloorPlanDrawing } from "@/components/results/floor-plan-2d";
 import { Card, CardTitle } from "@/components/ui/card";
 import type {
   FloorPlan,
@@ -13,6 +14,7 @@ import type {
   ModelOpening,
   RoofType,
 } from "@/lib/domain/types";
+import { cn } from "@/lib/utils";
 
 const FLOOR_HEIGHT = 2.7;
 const FOUNDATION_HEIGHT = 0.4;
@@ -896,12 +898,17 @@ export function Home3DPreview({
   model3D,
   upgrades,
   materials,
+  className,
+  variant = "card",
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
   upgrades?: GeneratedHomeConcept["upgrades"];
   materials?: GeneratedHomeConcept["materials"];
+  className?: string;
+  variant?: "card" | "workspace";
 }) {
+  const [showFloorPlan, setShowFloorPlan] = useState(false);
   const activeFeatures = useMemo(
     () =>
       (
@@ -920,26 +927,15 @@ export function Home3DPreview({
 
   const cameraDistance = Math.max(floorPlan.width, floorPlan.height) * 1.5;
 
-  return (
-    <Card className="overflow-hidden p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-            Generated 3D preview
-          </p>
-          <CardTitle className="mt-2">Your sustainable dream home</CardTitle>
-        </div>
-        <div className="text-sm text-[color:var(--muted)]">
-          {model3D.floors} floor{model3D.floors === 1 ? "" : "s"} ·{" "}
-          {model3D.roofType} roof · {model3D.exteriorColor}
-        </div>
-      </div>
-
-      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div
-          className="h-[480px] overflow-hidden rounded-[1.5rem] border border-[color:var(--border)] bg-[linear-gradient(180deg,#f4ecdf,#e8ddca)]"
-          data-testid="home-3d-canvas"
-        >
+  if (variant === "workspace") {
+    return (
+      <section
+        className={cn(
+          "relative h-[72vh] min-h-[620px] overflow-hidden bg-[linear-gradient(180deg,#f4ecdf,#e8ddca)] lg:h-screen lg:min-h-0",
+          className,
+        )}
+      >
+        <div className="absolute inset-0" data-testid="home-3d-canvas">
           <Canvas
             shadows
             camera={{
@@ -951,20 +947,189 @@ export function Home3DPreview({
           </Canvas>
         </div>
 
-        <aside className="space-y-5">
+        <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex flex-col gap-3 sm:inset-x-5 sm:top-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="pointer-events-auto rounded-[1.25rem] border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.72)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.14)] backdrop-blur-xl">
+            <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+              Generated 3D preview
+            </p>
+            <h2 className="font-tech mt-1 text-2xl tracking-[0.03em] text-[color:var(--foreground)]">
+              Your sustainable dream home
+            </h2>
+            <p className="mt-1 text-sm text-[color:var(--muted)]">
+              {model3D.floors} floor{model3D.floors === 1 ? "" : "s"} ·{" "}
+              {model3D.roofType} roof · {model3D.exteriorColor}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowFloorPlan((current) => !current)}
+            className="pointer-events-auto rounded-full border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.78)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] shadow-[0_12px_35px_rgba(45,39,28,0.12)] backdrop-blur-xl transition hover:border-[color:var(--accent)] hover:text-[color:var(--accent-dark)]"
+            aria-pressed={showFloorPlan}
+          >
+            {showFloorPlan ? "Hide floor plan" : "Show floor plan"}
+          </button>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-4 bottom-4 z-10 grid gap-3 sm:inset-x-5 sm:bottom-5 xl:grid-cols-[1fr_1fr]">
+          <div className="pointer-events-auto rounded-[1.25rem] border border-[rgba(61,93,72,0.16)] bg-[rgba(255,250,242,0.7)] p-3 shadow-[0_18px_55px_rgba(45,39,28,0.12)] backdrop-blur-xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+              Sustainability layer
+            </p>
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {activeFeatures.map((feature) => (
+                <li
+                  key={feature.key}
+                  className="flex items-center gap-2 rounded-full bg-[rgba(255,248,239,0.88)] px-3 py-1.5 text-xs"
+                >
+                  <span
+                    className="inline-block h-3 w-3 rounded-full"
+                    style={{
+                      backgroundColor: feature.color,
+                      boxShadow: `0 0 8px ${feature.color}`,
+                    }}
+                    aria-hidden
+                  />
+                  <span className="font-semibold text-[color:var(--foreground)]">
+                    {feature.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {upgrades?.length ? (
+            <div className="pointer-events-auto hidden rounded-[1.25rem] border border-[rgba(61,93,72,0.16)] bg-[rgba(255,250,242,0.7)] p-3 shadow-[0_18px_55px_rgba(45,39,28,0.12)] backdrop-blur-xl xl:block">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                Top upgrades
+              </p>
+              <div className="mt-2 grid gap-2">
+                {upgrades.slice(0, 2).map((upgrade) => (
+                  <div key={upgrade.title}>
+                    <p className="text-sm font-semibold text-[color:var(--foreground)]">
+                      {upgrade.title}
+                    </p>
+                    <p className="text-xs text-[color:var(--muted)]">
+                      {upgrade.category} · {upgrade.impactLevel} impact
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {showFloorPlan ? (
+          <div
+            className="absolute inset-4 z-20 overflow-auto rounded-[1.5rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] p-4 shadow-[0_24px_80px_rgba(45,39,28,0.2)] backdrop-blur-xl sm:inset-5"
+            data-testid="floor-plan-overlay"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  Floor plan
+                </p>
+                <p className="mt-1 text-sm text-[color:var(--foreground)]">
+                  Top-down room layout and openings
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFloorPlan(false)}
+                className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:text-[color:var(--foreground)]"
+              >
+                Close
+              </button>
+            </div>
+            <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} compact />
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <Card
+      className={cn(
+        "flex min-h-[640px] flex-col overflow-hidden p-4 md:p-5 lg:h-full lg:min-h-0",
+        className,
+      )}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+            Generated 3D preview
+          </p>
+          <CardTitle className="mt-2">Your sustainable dream home</CardTitle>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="text-sm text-[color:var(--muted)]">
+            {model3D.floors} floor{model3D.floors === 1 ? "" : "s"} ·{" "}
+            {model3D.roofType} roof
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFloorPlan((current) => !current)}
+            className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] transition hover:border-[color:var(--accent)] hover:text-[color:var(--accent-dark)]"
+            aria-pressed={showFloorPlan}
+          >
+            {showFloorPlan ? "Hide floor plan" : "Show floor plan"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+        <div
+          className="relative min-h-[440px] flex-1 overflow-hidden rounded-[1.5rem] border border-[color:var(--border)] bg-[linear-gradient(180deg,#f4ecdf,#e8ddca)] lg:min-h-0"
+          data-testid="home-3d-canvas"
+        >
+          <Canvas
+            shadows
+            camera={{
+              position: [cameraDistance, FLOOR_HEIGHT * 1.4, cameraDistance],
+              fov: 36,
+            }}
+          >
+            <HomeScene floorPlan={floorPlan} model3D={model3D} />
+          </Canvas>
+
+          {showFloorPlan ? (
+            <div
+              className="absolute inset-3 overflow-auto rounded-[1.25rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.18)] backdrop-blur-xl"
+              data-testid="floor-plan-overlay"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                    Floor plan
+                  </p>
+                  <p className="mt-1 text-sm text-[color:var(--foreground)]">
+                    Top-down room layout and openings
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFloorPlan(false)}
+                  className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:text-[color:var(--foreground)]"
+                >
+                  Close
+                </button>
+              </div>
+              <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} compact />
+            </div>
+          ) : null}
+        </div>
+
+        <aside className="grid gap-4 xl:grid-cols-[1fr_1fr]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
               Sustainability layer
             </p>
-            <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-              The highlighted elements below are the upgrades layered onto your
-              dream home concept.
-            </p>
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-3 flex flex-wrap gap-2">
               {activeFeatures.map((feature) => (
                 <li
                   key={feature.key}
-                  className="flex items-center gap-3 rounded-[0.85rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-2 text-sm"
+                  className="flex items-center gap-2 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs"
                 >
                   <span
                     className="inline-block h-3 w-3 rounded-full"
@@ -987,11 +1152,11 @@ export function Home3DPreview({
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
                 Top upgrades
               </p>
-              <div className="mt-3 space-y-2">
-                {upgrades.slice(0, 3).map((upgrade) => (
+              <div className="mt-3 grid gap-2">
+                {upgrades.slice(0, 2).map((upgrade) => (
                   <div
                     key={upgrade.title}
-                    className="rounded-[1rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] p-3"
+                    className="rounded-[1rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-2"
                   >
                     <p className="text-sm font-semibold text-[color:var(--foreground)]">
                       {upgrade.title}
@@ -1006,7 +1171,7 @@ export function Home3DPreview({
           ) : null}
 
           {materials?.[0] ? (
-            <p className="rounded-[1rem] bg-[color:var(--surface-muted)] p-3 text-sm leading-6 text-[color:var(--muted)]">
+            <p className="rounded-[1rem] bg-[color:var(--surface-muted)] p-3 text-sm leading-6 text-[color:var(--muted)] xl:col-span-2">
               Material cue:{" "}
               <span className="font-semibold text-[color:var(--foreground)]">
                 {materials[0].name}

@@ -437,12 +437,14 @@ function FloorSvg({
   );
 }
 
-export function FloorPlan2D({
+export function FloorPlanDrawing({
   floorPlan,
-  model3D
+  model3D,
+  compact = false
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
+  compact?: boolean;
 }) {
   const floors = useMemo(() => {
     const set = new Set<number>();
@@ -450,6 +452,72 @@ export function FloorPlan2D({
     return Array.from(set).sort((a, b) => a - b);
   }, [floorPlan.rooms]);
 
+  const hasSouthGlazing = useMemo(
+    () => model3D.windows.some((w) => w.wall === "south"),
+    [model3D.windows]
+  );
+
+  return (
+    <>
+      <div
+        className={
+          compact
+            ? "flex flex-wrap items-start justify-center gap-4 overflow-x-auto pb-2"
+            : "flex flex-wrap items-start justify-center gap-8 overflow-x-auto pb-2"
+        }
+      >
+        {floors.map((floor) => (
+          <FloorSvg
+            key={floor}
+            floorPlan={floorPlan}
+            model3D={model3D}
+            floor={floor}
+          />
+        ))}
+      </div>
+
+      <div
+        className={
+          compact
+            ? "mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[color:var(--border)] pt-4"
+            : "mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[color:var(--border)] pt-5"
+        }
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+          Room zones
+        </p>
+        {(Object.keys(roomColors) as FloorPlanRoomType[]).map((type) => (
+          <div key={type} className="flex items-center gap-2 text-sm">
+            <span
+              className="inline-block h-3 w-5 rounded-sm border border-[color:var(--border)]"
+              style={{ backgroundColor: roomColors[type] }}
+              aria-hidden
+            />
+            <span className="text-[color:var(--muted)]">
+              {roomTypeLabels[type]}
+            </span>
+          </div>
+        ))}
+        <span className="ml-auto flex items-center gap-2 text-xs text-[color:var(--muted)]">
+          <span
+            className="inline-block h-2 w-5 rounded-full"
+            style={{ backgroundColor: sustainabilityAccent }}
+            aria-hidden
+          />
+          {hasSouthGlazing ? "South-facing solar window" : "Window strategy"}
+        </span>
+      </div>
+    </>
+  );
+}
+
+export function FloorPlan2D({
+  floorPlan,
+  model3D
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+}) {
   const hasSouthGlazing = useMemo(
     () => model3D.windows.some((w) => w.wall === "south"),
     [model3D.windows]
@@ -472,41 +540,8 @@ export function FloorPlan2D({
         </p>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-start justify-center gap-8 overflow-x-auto pb-2">
-        {floors.map((floor) => (
-          <FloorSvg
-            key={floor}
-            floorPlan={floorPlan}
-            model3D={model3D}
-            floor={floor}
-          />
-        ))}
-      </div>
-
-      <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[color:var(--border)] pt-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-          Room zones
-        </p>
-        {(Object.keys(roomColors) as FloorPlanRoomType[]).map((type) => (
-          <div key={type} className="flex items-center gap-2 text-sm">
-            <span
-              className="inline-block h-3 w-5 rounded-sm border border-[color:var(--border)]"
-              style={{ backgroundColor: roomColors[type] }}
-              aria-hidden
-            />
-            <span className="text-[color:var(--muted)]">
-              {roomTypeLabels[type]}
-            </span>
-          </div>
-        ))}
-        <span className="ml-auto flex items-center gap-2 text-xs text-[color:var(--muted)]">
-          <span
-            className="inline-block h-2 w-5 rounded-full"
-            style={{ backgroundColor: sustainabilityAccent }}
-            aria-hidden
-          />
-          South-facing solar window
-        </span>
+      <div className="mt-6">
+        <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} />
       </div>
     </Card>
   );
