@@ -5,6 +5,7 @@ import type {
   SourceReference
 } from "@/lib/domain/home-concept-schema";
 import { generatedHomeConceptSchema } from "@/lib/domain/home-concept-schema";
+import { sanitizeHomeGeometry } from "@/lib/domain/home-geometry";
 import { sampleStructuredHomeConcept } from "@/lib/domain/sample-structured-home";
 
 function slugify(value: string) {
@@ -154,7 +155,7 @@ export function createFallbackStructuredHomeConcept({
   const summary = createSummary(input, style, guidanceSnippets);
   const scores = createScores(input);
 
-  return generatedHomeConceptSchema.parse({
+  return generatedHomeConceptSchema.parse(sanitizeHomeGeometry({
     ...sampleStructuredHomeConcept,
     projectId: createProjectId(input.location),
     generatedAt: new Date().toISOString(),
@@ -170,5 +171,5 @@ export function createFallbackStructuredHomeConcept({
     inspirationImages: input.inspirationImages,
     styleAnalysis: input.styleAnalysis,
     guidanceSnippets
-  });
+  }));
 }

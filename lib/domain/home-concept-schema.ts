@@ -140,7 +140,115 @@ export const visualPromptsSchema = z.object({
   interiorPrompt: z.string().min(1).max(800)
 });
 
-export const homeConceptSchema = z.object({
+function validateRenderableGeometry(
+  concept: {
+    floorPlan: z.infer<typeof floorPlanSchema>;
+    model3D: z.infer<typeof model3DSchema>;
+  },
+  context: z.RefinementCtx
+) {
+  const highestRoomFloor = Math.max(
+    0,
+    ...concept.floorPlan.rooms.map((room) => room.floor)
+  );
+
+  if (concept.model3D.floors <= highestRoomFloor) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["model3D", "floors"],
+      message: "Building floors must include every floor used by the floor plan."
+    });
+  }
+
+  concept.floorPlan.rooms.forEach((room, index) => {
+    if (
+      room.x + room.width > concept.floorPlan.width ||
+      room.y + room.height > concept.floorPlan.height
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["floorPlan", "rooms", index],
+        message: "Room must stay inside the floor plan bounds."
+      });
+    }
+  });
+
+  const openingFitsWall = (
+    opening: z.infer<typeof modelOpeningSchema>
+  ) => {
+    const wallLength =
+      opening.wall === "north" || opening.wall === "south"
+        ? concept.floorPlan.width
+        : concept.floorPlan.height;
+    const halfWidthRatio = opening.width / wallLength / 2;
+
+    return opening.offset >= halfWidthRatio && opening.offset <= 1 - halfWidthRatio;
+  };
+
+  concept.model3D.windows.forEach((window, index) => {
+    if (
+      window.width < 0.6 ||
+      window.width > 3.2 ||
+      window.height < 0.6 ||
+      window.height > 2
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["model3D", "windows", index],
+        message: "Window dimensions must stay within renderable house-like bounds."
+      });
+    }
+
+    if (window.floor >= concept.model3D.floors) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["model3D", "windows", index, "floor"],
+        message: "Window floor must exist in the building."
+      });
+    }
+
+    if (!openingFitsWall(window)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["model3D", "windows", index, "offset"],
+        message: "Window must fit fully on its wall."
+      });
+    }
+  });
+
+  concept.model3D.doors.forEach((door, index) => {
+    if (
+      door.width < 0.8 ||
+      door.width > 2.4 ||
+      door.height < 2 ||
+      door.height > 2.5
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["model3D", "doors", index],
+        message: "Door dimensions must stay within renderable house-like bounds."
+      });
+    }
+
+    if (door.floor !== 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["model3D", "doors", index, "floor"],
+        message: "Doors must be ground-level openings."
+      });
+    }
+
+    if (!openingFitsWall(door)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["model3D", "doors", index, "offset"],
+        message: "Door must fit fully on its wall."
+      });
+    }
+  });
+}
+
+const baseHomeConceptSchema = z.object({
   conceptSummary: z.string().min(1).max(600),
   location: z.string().trim().min(2).max(120),
   climateType: z.enum(climateRegionValues),
@@ -155,14 +263,18 @@ export const homeConceptSchema = z.object({
   sources: z.array(sourceReferenceSchema).max(8).default([])
 });
 
-export const generatedHomeConceptSchema = homeConceptSchema.extend({
+export const homeConceptSchema = baseHomeConceptSchema.superRefine(
+  validateRenderableGeometry
+);
+
+export const generatedHomeConceptSchema = baseHomeConceptSchema.extend({
   projectId: z.string().min(1).max(80),
   generatedAt: z.string().datetime(),
   sourcePrompt: z.string().trim().min(1).max(1500),
   inspirationImages: z.array(inspirationImageSchema).default([]),
   styleAnalysis: styleAnalysisSchema.nullish(),
   guidanceSnippets: z.array(guidanceSnippetSchema).default([])
-});
+}).superRefine(validateRenderableGeometry);
 
 export const generateHomeRequestSchema = z.object({
   description: z.string().trim().min(MIN_DESCRIPTION_LENGTH).max(1500),

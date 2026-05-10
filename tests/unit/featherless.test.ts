@@ -246,7 +246,7 @@ describe("generateStructuredHomeConceptWithFeatherless", () => {
                     offset: 87,
                     width: "1.1",
                     height: "2.2",
-                    floor: 0,
+                    floor: 2,
                   },
                 ],
                 sustainabilityFeatures: {
@@ -294,8 +294,9 @@ describe("generateStructuredHomeConceptWithFeatherless", () => {
     ]);
     expect(concept.model3D.roofType).toBe("flat");
     expect(concept.model3D.windows[0]?.offset).toBe(0.28);
-    expect(concept.model3D.windows[1]?.offset).toBe(1);
+    expect(concept.model3D.windows[1]?.offset).toBe(0.92);
     expect(concept.model3D.doors[0]?.offset).toBe(0.87);
+    expect(concept.model3D.doors[0]?.floor).toBe(0);
     expect(concept.model3D.sustainabilityFeatures).toEqual({
       solarPanels: true,
       greenRoof: false,
