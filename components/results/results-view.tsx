@@ -50,7 +50,7 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
             </span>
           </div>
           <div className="mt-8 space-y-5">
-            <h1 className="max-w-3xl text-5xl text-[color:var(--foreground)]">
+            <h1 className="font-tech max-w-3xl text-5xl leading-[1.04] tracking-[0.03em] text-[color:var(--foreground)]">
               {project.heroTitle}
             </h1>
             <p className="max-w-3xl text-lg leading-8 text-[color:var(--muted)]">
@@ -59,7 +59,7 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             <div className="rounded-[1.5rem] bg-[color:var(--surface-muted)] p-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+              <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
                 Climate response
               </p>
               <p className="mt-3 leading-7 text-[color:var(--foreground)]">
@@ -67,7 +67,7 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
               </p>
             </div>
             <div className="rounded-[1.5rem] bg-[color:var(--surface-muted)] p-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+              <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
                 Budget strategy
               </p>
               <p className="mt-3 leading-7 text-[color:var(--foreground)]">
@@ -78,7 +78,7 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
         </Card>
 
         <Card className="rounded-[2rem] p-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+          <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
             Sustainability score
           </p>
           <div className="mt-4 flex items-end gap-4">

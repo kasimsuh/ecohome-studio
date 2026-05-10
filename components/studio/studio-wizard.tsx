@@ -241,7 +241,9 @@ export function StudioWizard({
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
                   Step {index + 1}
                 </p>
-                <p className="mt-2 text-xl text-[color:var(--foreground)]">{step}</p>
+                <p className="font-tech mt-2 text-xl tracking-[0.03em] text-[color:var(--foreground)]">
+                  {step}
+                </p>
               </div>
             );
           })}
@@ -252,7 +254,9 @@ export function StudioWizard({
         {stepIndex === 0 ? (
           <div className="space-y-6">
             <div>
-              <CardTitle>Describe the dream home</CardTitle>
+              <CardTitle className="font-tech tracking-[0.03em]">
+                Describe the dream home
+              </CardTitle>
               <CardDescription>
                 Capture style, atmosphere, lifestyle, and spaces that matter so
                 the sustainability layer has something real to work with.
@@ -279,7 +283,9 @@ export function StudioWizard({
         {stepIndex === 1 ? (
           <div className="space-y-6">
             <div>
-              <CardTitle>Upload inspiration images</CardTitle>
+              <CardTitle className="font-tech tracking-[0.03em]">
+                Upload inspiration images
+              </CardTitle>
               <CardDescription>
                 The starter uses a mocked vision pass to extract style cues from
                 filenames and metadata, giving you a clean place to wire real
@@ -346,7 +352,9 @@ export function StudioWizard({
         {stepIndex === 2 ? (
           <div className="space-y-8">
             <div>
-              <CardTitle>Set climate and budget context</CardTitle>
+              <CardTitle className="font-tech tracking-[0.03em]">
+                Set climate and budget context
+              </CardTitle>
               <CardDescription>
                 This drives the recommendation engine, score weighting, and
                 climate narrative on the results page.
@@ -422,7 +430,9 @@ export function StudioWizard({
         {stepIndex === 3 ? (
           <div className="space-y-6">
             <div>
-              <CardTitle>Review before generation</CardTitle>
+              <CardTitle className="font-tech tracking-[0.03em]">
+                Review before generation
+              </CardTitle>
               <CardDescription>
                 Submit the form to create a mock concept package and route into
                 the results dashboard shell.

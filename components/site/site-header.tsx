@@ -8,7 +8,7 @@ export function SiteHeader() {
       <div className="shell flex items-center justify-between py-4">
         <Link href="/" className="block">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--accent)]">
+            <p className="font-tech text-sm font-semibold uppercase tracking-[0.22em] text-[color:var(--accent)]">
               EcoHome Studio
             </p>
             <p className="text-sm text-[color:var(--muted)]">
@@ -17,7 +17,10 @@ export function SiteHeader() {
           </div>
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-medium text-[color:var(--muted)] md:flex">
-          <Link href="/studio" className="transition hover:text-[color:var(--foreground)]">
+          <Link
+            href="/studio"
+            className="transition hover:text-[color:var(--foreground)]"
+          >
             Studio
           </Link>
           <Link

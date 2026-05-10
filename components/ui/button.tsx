@@ -15,7 +15,7 @@ export function buttonStyles({
   return cn(
     "inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-60",
     variant === "primary" &&
-      "bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-dark)]",
+      "bg-[color:var(--accent)] !text-white hover:!text-white hover:bg-[color:var(--accent-dark)]",
     variant === "secondary" &&
       "border border-[color:var(--border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-muted)]",
     variant === "ghost" &&

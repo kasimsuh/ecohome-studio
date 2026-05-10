@@ -15,7 +15,10 @@ export function CardTitle({
 }: HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={cn("text-2xl text-[color:var(--foreground)]", className)}
+      className={cn(
+        "font-tech text-2xl tracking-[0.03em] text-[color:var(--foreground)]",
+        className
+      )}
       {...props}
     />
   );

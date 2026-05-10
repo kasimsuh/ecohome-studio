@@ -14,7 +14,9 @@ export function SectionHeading({
   return (
     <div className={cn("space-y-3", className)}>
       <span className="section-kicker">{kicker}</span>
-      <h2 className="text-3xl text-[color:var(--foreground)] md:text-4xl">{title}</h2>
+      <h2 className="font-tech text-3xl tracking-[0.03em] text-[color:var(--foreground)] md:text-4xl">
+        {title}
+      </h2>
       {description ? (
         <p className="max-w-3xl leading-7 text-[color:var(--muted)]">{description}</p>
       ) : null}

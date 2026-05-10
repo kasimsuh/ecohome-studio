@@ -15,7 +15,12 @@
   --highlight: #c49b68;
   --shadow: 0 24px 80px rgba(102, 83, 54, 0.1);
   --font-sans: "Avenir Next", "Segoe UI", sans-serif;
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --font-display:
+    var(--font-tech),
+    "Avenir Next Condensed",
+    "Avenir Next",
+    "Segoe UI",
+    sans-serif;
 }
 
 * {
@@ -92,11 +97,26 @@ h4 {
 }
 
 .section-kicker {
+  font-family:
+    var(--font-tech),
+    "Avenir Next Condensed",
+    "Avenir Next",
+    "Segoe UI",
+    sans-serif;
   color: var(--accent);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+}
+
+.font-tech {
+  font-family:
+    var(--font-tech),
+    "Avenir Next Condensed",
+    "Avenir Next",
+    "Segoe UI",
+    sans-serif !important;
 }
 
 .fade-up {

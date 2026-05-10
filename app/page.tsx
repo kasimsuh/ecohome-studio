@@ -6,18 +6,18 @@ const quickStarts = [
   {
     label: "Passive family home",
     prompt:
-      "A light-filled family home with passive solar gain, flexible work space, durable low-carbon materials, and a close connection to the garden."
+      "A light-filled family home with passive solar gain, flexible work space, durable low-carbon materials, and a close connection to the garden.",
   },
   {
     label: "Rain-ready coastal retreat",
     prompt:
-      "A calm coastal home designed for storm resilience, natural ventilation, moisture-tolerant materials, and easy long-term maintenance."
+      "A calm coastal home designed for storm resilience, natural ventilation, moisture-tolerant materials, and easy long-term maintenance.",
   },
   {
     label: "Compact urban infill",
     prompt:
-      "A compact urban infill home that feels spacious, uses smart daylighting, supports a tight footprint, and keeps energy use low."
-  }
+      "A compact urban infill home that feels spacious, uses smart daylighting, supports a tight footprint, and keeps energy use low.",
+  },
 ];
 
 function ArrowUpIcon() {
@@ -48,7 +48,7 @@ export default function HomePage() {
         <header className="fade-up flex items-center justify-between gap-4">
           <Link href="/" className="block">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--accent)]">
+              <p className="font-tech text-sm font-semibold uppercase tracking-[0.22em] text-[color:var(--accent)]">
                 EcoHome Studio
               </p>
               <p className="text-sm text-[color:var(--muted)]">
@@ -72,12 +72,12 @@ export default function HomePage() {
 
         <main className="flex flex-1 flex-col pb-10 pt-12 md:pt-16">
           <section className="fade-up-delay mx-auto mt-[11vh] max-w-xl text-center md:mt-[15vh]">
-            <span className="inline-flex rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent)]">
+            <span className="font-tech inline-flex rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent)]">
               Eco-conscious home design
             </span>
 
             <div className="mt-6 space-y-3">
-              <h1 className="text-[clamp(2.25rem,4.6vw,3.9rem)] leading-[0.98] text-[color:var(--foreground)]">
+              <h1 className="font-tech text-[clamp(2.25rem,4.6vw,3.9rem)] leading-[1.02] tracking-[0.03em] text-[color:var(--foreground)]">
                 Start with a home idea.
                 <span className="block text-[color:var(--accent)]">
                   We shape the sustainable concept.
@@ -131,7 +131,7 @@ export default function HomePage() {
                     key={item.label}
                     href={{
                       pathname: "/studio",
-                      query: { brief: item.prompt }
+                      query: { brief: item.prompt },
                     }}
                     className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2 text-sm text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:text-[color:var(--foreground)]"
                   >
