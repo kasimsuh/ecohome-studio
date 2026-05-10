@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Sky, Environment, ContactShadows } from "@react-three/drei";
 
 import { FloorPlanDrawing } from "@/components/results/floor-plan-2d";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -150,19 +150,32 @@ function Window({
         <boxGeometry args={[frameT, h, frameDepth]} />
         <meshStandardMaterial color="#3d3a32" roughness={0.7} />
       </mesh>
+      {/* Glass pane – physical transmission for real glass look */}
       <mesh>
         <boxGeometry args={[w, h, 0.04]} />
-        <meshStandardMaterial
-          color="#bcdfd2"
-          transparent
-          opacity={0.7}
-          metalness={0.55}
-          roughness={0.12}
+        <meshPhysicalMaterial
+          color="#c8e8e4"
+          transmission={0.84}
+          roughness={0.04}
+          metalness={0}
+          ior={1.5}
+          thickness={0.06}
         />
       </mesh>
-      <mesh>
-        <boxGeometry args={[w, frameT * 0.55, 0.06]} />
-        <meshStandardMaterial color="#3d3a32" />
+      {/* Horizontal mid-rail divider */}
+      <mesh position={[0, 0, 0.025]}>
+        <boxGeometry args={[w, frameT * 0.5, 0.03]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+      </mesh>
+      {/* Vertical mid-post divider */}
+      <mesh position={[0, 0, 0.025]}>
+        <boxGeometry args={[frameT * 0.5, h, 0.03]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+      </mesh>
+      {/* Exterior sill – protruding shelf below the frame */}
+      <mesh position={[0, -h / 2 - frameT * 0.6, frameDepth / 2 + 0.06]} castShadow>
+        <boxGeometry args={[w + frameT * 2 + 0.12, 0.06, 0.15]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.75} />
       </mesh>
     </group>
   );
@@ -456,6 +469,15 @@ function GableRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
         <boxGeometry args={[w + 0.06, 0.1, 0.2]} />
         <meshStandardMaterial color="#2f2c25" />
       </mesh>
+      {/* Eave fascia boards – south and north edges */}
+      <mesh position={[0, 0.09, d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, 0.2, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+      <mesh position={[0, 0.09, -d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, 0.2, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
     </group>
   );
 }
@@ -496,13 +518,28 @@ function HipRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
   }, [w, d, peak]);
 
   return (
-    <mesh position={[0, top, 0]} geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial
-        color="#4a4339"
-        side={THREE.DoubleSide}
-        roughness={0.92}
-      />
-    </mesh>
+    <group position={[0, top, 0]}>
+      <mesh geometry={geometry} castShadow receiveShadow>
+        <meshStandardMaterial color="#4a4339" side={THREE.DoubleSide} roughness={0.92} />
+      </mesh>
+      {/* Eave fascia – all 4 edges */}
+      <mesh position={[0, 0.05, d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, 0.18, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+      <mesh position={[0, 0.05, -d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, 0.18, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+      <mesh position={[w / 2, 0.05, 0]} castShadow>
+        <boxGeometry args={[0.09, 0.18, d]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+      <mesh position={[-w / 2, 0.05, 0]} castShadow>
+        <boxGeometry args={[0.09, 0.18, d]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+    </group>
   );
 }
 
@@ -790,29 +827,45 @@ function Trees({ floorPlan }: { floorPlan: FloorPlan }) {
 
   return (
     <>
-      {positions.map(([x, z, scale, hue], i) => (
-        <group
-          key={`tree-${i}`}
-          position={[x, 0, z]}
-          scale={[scale, scale, scale]}
-        >
-          <mesh position={[0, 0.45, 0]} castShadow>
-            <cylinderGeometry args={[0.08, 0.12, 0.9, 12]} />
-            <meshStandardMaterial color="#6a5236" roughness={0.95} />
-          </mesh>
-          <mesh position={[0, 1.15, 0]} castShadow>
-            <sphereGeometry args={[0.5, 16, 16]} />
-            <meshStandardMaterial
-              color={hue > 1 ? "#5b8a4d" : "#6e9a58"}
-              roughness={0.92}
-            />
-          </mesh>
-          <mesh position={[0.18, 1.4, 0.12]} castShadow>
-            <sphereGeometry args={[0.32, 14, 14]} />
-            <meshStandardMaterial color="#79a861" roughness={0.92} />
-          </mesh>
-        </group>
-      ))}
+      {positions.map(([x, z, scale, hue], i) => {
+        const dark = hue > 1 ? "#4a7a40" : "#5b8a4d";
+        const mid = hue > 1 ? "#5b8a4d" : "#6e9a58";
+        const light = "#79a861";
+        return (
+          <group key={`tree-${i}`} position={[x, 0, z]} scale={[scale, scale, scale]}>
+            {/* Tapered trunk – two stacked cylinders */}
+            <mesh position={[0, 0.3, 0]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.09, 0.14, 0.6, 10]} />
+              <meshStandardMaterial color="#6a5236" roughness={0.97} />
+            </mesh>
+            <mesh position={[0, 0.72, 0]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.06, 0.09, 0.48, 10]} />
+              <meshStandardMaterial color="#7a6040" roughness={0.97} />
+            </mesh>
+            {/* Canopy – 5 overlapping spheres for organic silhouette */}
+            <mesh position={[0, 1.15, 0]} castShadow receiveShadow>
+              <sphereGeometry args={[0.52, 14, 14]} />
+              <meshStandardMaterial color={dark} roughness={0.93} />
+            </mesh>
+            <mesh position={[-0.28, 1.38, 0.18]} castShadow>
+              <sphereGeometry args={[0.38, 12, 12]} />
+              <meshStandardMaterial color={mid} roughness={0.92} />
+            </mesh>
+            <mesh position={[0.3, 1.45, -0.15]} castShadow>
+              <sphereGeometry args={[0.36, 12, 12]} />
+              <meshStandardMaterial color={mid} roughness={0.92} />
+            </mesh>
+            <mesh position={[0.1, 1.72, 0.08]} castShadow>
+              <sphereGeometry args={[0.30, 12, 12]} />
+              <meshStandardMaterial color={light} roughness={0.91} />
+            </mesh>
+            <mesh position={[-0.12, 1.9, -0.1]} castShadow>
+              <sphereGeometry args={[0.22, 10, 10]} />
+              <meshStandardMaterial color={light} roughness={0.90} />
+            </mesh>
+          </group>
+        );
+      })}
     </>
   );
 }
@@ -832,6 +885,44 @@ function Ground({ floorPlan }: { floorPlan: FloorPlan }) {
   );
 }
 
+function EntryCanopy({
+  floorPlan,
+  model3D,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+}) {
+  const door = model3D.doors.find((d) => d.wall === "south" && d.floor === 0);
+  if (!door) return null;
+
+  const doorX = door.offset * floorPlan.width - floorPlan.width / 2;
+  const canopyY = FOUNDATION_HEIGHT + door.height + 0.04;
+  const canopyW = door.width + 0.9;
+  const canopyProtrude = 0.7;
+  const slabT = 0.09;
+  const postH = door.height + 0.04;
+
+  return (
+    <group position={[doorX, canopyY, floorPlan.height / 2]}>
+      {/* Canopy slab */}
+      <mesh castShadow receiveShadow position={[0, slabT / 2, canopyProtrude / 2]}>
+        <boxGeometry args={[canopyW, slabT, canopyProtrude]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.78} />
+      </mesh>
+      {/* Left support post */}
+      <mesh castShadow position={[-(canopyW / 2 - 0.07), -postH / 2, canopyProtrude - 0.05]}>
+        <boxGeometry args={[0.09, postH, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.85} />
+      </mesh>
+      {/* Right support post */}
+      <mesh castShadow position={[canopyW / 2 - 0.07, -postH / 2, canopyProtrude - 0.05]}>
+        <boxGeometry args={[0.09, postH, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.85} />
+      </mesh>
+    </group>
+  );
+}
+
 function HomeScene({
   floorPlan,
   model3D,
@@ -843,21 +934,27 @@ function HomeScene({
 
   return (
     <>
-      <ambientLight intensity={0.4} />
+      <Sky sunPosition={[50, 20, 30]} turbidity={5} rayleigh={0.5} mieCoefficient={0.005} mieDirectionalG={0.8} />
+      <Environment preset="sunset" />
+      <ambientLight intensity={0.22} />
       <directionalLight
         position={[12, 16, 9]}
-        intensity={1.5}
+        intensity={1.2}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-bias={-0.001}
+        shadow-camera-near={0.5}
+        shadow-camera-far={60}
         shadow-camera-left={-30}
         shadow-camera-right={30}
         shadow-camera-top={30}
         shadow-camera-bottom={-30}
       />
-      <directionalLight position={[-10, 8, -6]} intensity={0.45} />
+      <directionalLight position={[-10, 8, -6]} intensity={0.3} />
 
       <Ground floorPlan={floorPlan} />
+      <ContactShadows position={[0, 0.02, 0]} opacity={0.32} scale={50} blur={2.8} far={12} />
       <Foundation floorPlan={floorPlan} />
       <WallsWithOpenings floorPlan={floorPlan} model3D={model3D} />
       <Roof floorPlan={floorPlan} model3D={model3D} />
@@ -868,6 +965,7 @@ function HomeScene({
       {model3D.doors.map((d, i) => (
         <Door key={`door-${i}`} opening={d} floorPlan={floorPlan} />
       ))}
+      <EntryCanopy floorPlan={floorPlan} model3D={model3D} />
 
       {features.solarPanels ? (
         <SolarArray floorPlan={floorPlan} model3D={model3D} />
