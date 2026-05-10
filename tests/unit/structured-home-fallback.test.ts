@@ -11,16 +11,16 @@ describe("createFallbackStructuredHomeConcept", () => {
         climateRegion: "cold",
         budgetLevel: "medium",
         inspirationImages: [],
-        styleAnalysis: null
+        styleAnalysis: null,
       },
       guidanceSnippets: [
         {
           title: "Cold climate envelope",
           source: "climate-resilience.md",
           content:
-            "Use airtight detailing, continuous insulation, and heat recovery before oversizing mechanical systems."
-        }
-      ]
+            "Use airtight detailing, continuous insulation, and heat recovery before oversizing mechanical systems.",
+        },
+      ],
     });
 
     expect(() => generatedHomeConceptSchema.parse(concept)).not.toThrow();

@@ -1,0 +1,1020 @@
+"use client";
+
+import { useMemo } from "react";
+import * as THREE from "three";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
+
+import { Card, CardTitle } from "@/components/ui/card";
+import type {
+  FloorPlan,
+  GeneratedHomeConcept,
+  Model3D,
+  ModelOpening,
+  RoofType,
+} from "@/lib/domain/types";
+
+const FLOOR_HEIGHT = 2.7;
+const FOUNDATION_HEIGHT = 0.4;
+const FOUNDATION_OVERHANG = 0.35;
+const ROOF_OVERHANG = 0.45;
+const WINDOW_SILL = 0.95;
+const WALL_THICKNESS = 0.28;
+
+const exteriorColorMap: Record<string, string> = {
+  "sandstone-beige": "#dcc8a4",
+  "warm-white": "#ece6d6",
+  "warm-grey": "#bcb6ac",
+  "soft-grey": "#c5beb4",
+  charcoal: "#4d4942",
+  cedar: "#a17350",
+  sage: "#a3ae8d",
+  linen: "#e6dcc6",
+  white: "#f1ece1",
+  beige: "#dcc8a4",
+};
+
+function resolveExteriorColor(value: string) {
+  if (!value) return "#dcc8a4";
+  const key = value.toLowerCase().trim().replace(/\s+/g, "-");
+  return exteriorColorMap[key] ?? "#dcc8a4";
+}
+
+const sustainabilityAccent: Record<
+  keyof Model3D["sustainabilityFeatures"],
+  string
+> = {
+  solarPanels: "#3a6db5",
+  greenRoof: "#7fae5e",
+  rainwaterTank: "#4f9aa8",
+  trees: "#5b8a4d",
+  permeableDriveway: "#9eaab2",
+  crossVentilation: "#7cc6c8",
+};
+
+const sustainabilityLabels: Record<
+  keyof Model3D["sustainabilityFeatures"],
+  string
+> = {
+  solarPanels: "Solar array",
+  greenRoof: "Green roof",
+  rainwaterTank: "Rainwater capture",
+  trees: "Native canopy",
+  permeableDriveway: "Permeable driveway",
+  crossVentilation: "Cross ventilation",
+};
+
+function openingTransform(
+  opening: ModelOpening,
+  floorPlan: FloorPlan,
+  isDoor: boolean,
+  outsetDepth: number,
+) {
+  const baseY = FOUNDATION_HEIGHT + opening.floor * FLOOR_HEIGHT;
+  const sill = isDoor ? 0 : WINDOW_SILL;
+  const y = baseY + sill + opening.height / 2;
+  const alongW = opening.offset * floorPlan.width - floorPlan.width / 2;
+  const alongH = opening.offset * floorPlan.height - floorPlan.height / 2;
+
+  switch (opening.wall) {
+    case "south":
+      return {
+        position: [alongW, y, floorPlan.height / 2 + outsetDepth] as [
+          number,
+          number,
+          number,
+        ],
+        rotationY: 0,
+      };
+    case "north":
+      return {
+        position: [alongW, y, -floorPlan.height / 2 - outsetDepth] as [
+          number,
+          number,
+          number,
+        ],
+        rotationY: Math.PI,
+      };
+    case "east":
+      return {
+        position: [floorPlan.width / 2 + outsetDepth, y, alongH] as [
+          number,
+          number,
+          number,
+        ],
+        rotationY: -Math.PI / 2,
+      };
+    case "west":
+    default:
+      return {
+        position: [-floorPlan.width / 2 - outsetDepth, y, alongH] as [
+          number,
+          number,
+          number,
+        ],
+        rotationY: Math.PI / 2,
+      };
+  }
+}
+
+function Window({
+  opening,
+  floorPlan,
+}: {
+  opening: ModelOpening;
+  floorPlan: FloorPlan;
+}) {
+  const frameT = 0.08;
+  const frameDepth = 0.16;
+  const t = openingTransform(opening, floorPlan, false, -WALL_THICKNESS / 2);
+  const w = opening.width;
+  const h = opening.height;
+
+  return (
+    <group position={t.position} rotation={[0, t.rotationY, 0]}>
+      <mesh position={[0, h / 2 + frameT / 2, 0]}>
+        <boxGeometry args={[w + frameT * 2, frameT, frameDepth]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+      </mesh>
+      <mesh position={[0, -h / 2 - frameT / 2, 0]}>
+        <boxGeometry args={[w + frameT * 2, frameT, frameDepth]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+      </mesh>
+      <mesh position={[-w / 2 - frameT / 2, 0, 0]}>
+        <boxGeometry args={[frameT, h, frameDepth]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+      </mesh>
+      <mesh position={[w / 2 + frameT / 2, 0, 0]}>
+        <boxGeometry args={[frameT, h, frameDepth]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+      </mesh>
+      <mesh>
+        <boxGeometry args={[w, h, 0.04]} />
+        <meshStandardMaterial
+          color="#bcdfd2"
+          transparent
+          opacity={0.7}
+          metalness={0.55}
+          roughness={0.12}
+        />
+      </mesh>
+      <mesh>
+        <boxGeometry args={[w, frameT * 0.55, 0.06]} />
+        <meshStandardMaterial color="#3d3a32" />
+      </mesh>
+    </group>
+  );
+}
+
+function Door({
+  opening,
+  floorPlan,
+}: {
+  opening: ModelOpening;
+  floorPlan: FloorPlan;
+}) {
+  const frameT = 0.1;
+  const frameDepth = 0.18;
+  const t = openingTransform(opening, floorPlan, true, -WALL_THICKNESS / 2);
+  const w = opening.width;
+  const h = opening.height;
+
+  return (
+    <group position={t.position} rotation={[0, t.rotationY, 0]}>
+      <mesh position={[0, h / 2 + frameT / 2, 0]}>
+        <boxGeometry args={[w + frameT * 2, frameT, frameDepth]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.7} />
+      </mesh>
+      <mesh position={[-w / 2 - frameT / 2, 0, 0]}>
+        <boxGeometry args={[frameT, h + frameT, frameDepth]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.7} />
+      </mesh>
+      <mesh position={[w / 2 + frameT / 2, 0, 0]}>
+        <boxGeometry args={[frameT, h + frameT, frameDepth]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.7} />
+      </mesh>
+      <mesh>
+        <boxGeometry args={[w, h, 0.07]} />
+        <meshStandardMaterial color="#7a5b3b" roughness={0.75} />
+      </mesh>
+      <mesh position={[w * 0.32, 0, 0.05]}>
+        <sphereGeometry args={[0.05, 12, 12]} />
+        <meshStandardMaterial color="#c8a86a" metalness={0.6} roughness={0.3} />
+      </mesh>
+    </group>
+  );
+}
+
+function Foundation({ floorPlan }: { floorPlan: FloorPlan }) {
+  const w = floorPlan.width + FOUNDATION_OVERHANG * 2;
+  const d = floorPlan.height + FOUNDATION_OVERHANG * 2;
+  return (
+    <mesh position={[0, FOUNDATION_HEIGHT / 2, 0]} receiveShadow castShadow>
+      <boxGeometry args={[w, FOUNDATION_HEIGHT, d]} />
+      <meshStandardMaterial color="#9b9085" roughness={0.95} />
+    </mesh>
+  );
+}
+
+function WallsWithOpenings({
+  floorPlan,
+  model3D,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+}) {
+  const color = resolveExteriorColor(model3D.exteriorColor);
+  const T = WALL_THICKNESS;
+  const fW = floorPlan.width;
+  const fH = floorPlan.height;
+
+  const wallDefs = useMemo(() => {
+    type WallDef = {
+      geo: THREE.BufferGeometry;
+      position: [number, number, number];
+      rotationY: number;
+    };
+    const result: WallDef[] = [];
+
+    const wallConfigs = [
+      {
+        key: "south" as const,
+        wallW: fW,
+        pos: (baseY: number): [number, number, number] => [
+          0,
+          baseY,
+          fH / 2 - T,
+        ],
+        rotY: 0,
+        holeX: (offset: number) => offset * fW - fW / 2,
+      },
+      {
+        key: "north" as const,
+        wallW: fW,
+        pos: (baseY: number): [number, number, number] => [
+          0,
+          baseY,
+          -fH / 2 + T,
+        ],
+        rotY: Math.PI,
+        holeX: (offset: number) => fW / 2 - offset * fW,
+      },
+      {
+        key: "east" as const,
+        wallW: fH,
+        pos: (baseY: number): [number, number, number] => [
+          fW / 2 - T,
+          baseY,
+          0,
+        ],
+        rotY: Math.PI / 2,
+        holeX: (offset: number) => fH / 2 - offset * fH,
+      },
+      {
+        key: "west" as const,
+        wallW: fH,
+        pos: (baseY: number): [number, number, number] => [
+          -fW / 2 + T,
+          baseY,
+          0,
+        ],
+        rotY: -Math.PI / 2,
+        holeX: (offset: number) => offset * fH - fH / 2,
+      },
+    ];
+
+    for (let floor = 0; floor < model3D.floors; floor++) {
+      const baseY = FOUNDATION_HEIGHT + floor * FLOOR_HEIGHT;
+
+      for (const cfg of wallConfigs) {
+        const shape = new THREE.Shape();
+        shape.moveTo(-cfg.wallW / 2, 0);
+        shape.lineTo(cfg.wallW / 2, 0);
+        shape.lineTo(cfg.wallW / 2, FLOOR_HEIGHT);
+        shape.lineTo(-cfg.wallW / 2, FLOOR_HEIGHT);
+        shape.lineTo(-cfg.wallW / 2, 0);
+
+        const wins = model3D.windows.filter(
+          (o) => o.wall === cfg.key && o.floor === floor,
+        );
+        const drs = model3D.doors.filter(
+          (o) => o.wall === cfg.key && o.floor === floor,
+        );
+
+        for (const o of wins) {
+          const cx = cfg.holeX(o.offset);
+          const cy = WINDOW_SILL + o.height / 2;
+          const p = new THREE.Path();
+          p.moveTo(cx - o.width / 2, cy - o.height / 2);
+          p.lineTo(cx + o.width / 2, cy - o.height / 2);
+          p.lineTo(cx + o.width / 2, cy + o.height / 2);
+          p.lineTo(cx - o.width / 2, cy + o.height / 2);
+          p.lineTo(cx - o.width / 2, cy - o.height / 2);
+          shape.holes.push(p);
+        }
+        for (const o of drs) {
+          const cx = cfg.holeX(o.offset);
+          const cy = o.height / 2;
+          const p = new THREE.Path();
+          p.moveTo(cx - o.width / 2, cy - o.height / 2);
+          p.lineTo(cx + o.width / 2, cy - o.height / 2);
+          p.lineTo(cx + o.width / 2, cy + o.height / 2);
+          p.lineTo(cx - o.width / 2, cy + o.height / 2);
+          p.lineTo(cx - o.width / 2, cy - o.height / 2);
+          shape.holes.push(p);
+        }
+
+        const geo = new THREE.ExtrudeGeometry(shape, {
+          depth: T,
+          bevelEnabled: false,
+        });
+        result.push({ geo, position: cfg.pos(baseY), rotationY: cfg.rotY });
+      }
+    }
+
+    return result;
+  }, [fW, fH, model3D, T]);
+
+  return (
+    <group>
+      {wallDefs.map((def, i) => (
+        <mesh
+          key={i}
+          geometry={def.geo}
+          position={def.position}
+          rotation={[0, def.rotationY, 0]}
+          castShadow
+          receiveShadow
+        >
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </mesh>
+      ))}
+
+      {Array.from({ length: Math.max(0, model3D.floors - 1) }).map((_, i) => (
+        <mesh
+          key={`band-${i}`}
+          position={[0, FOUNDATION_HEIGHT + (i + 1) * FLOOR_HEIGHT, 0]}
+        >
+          <boxGeometry args={[fW + 0.1, 0.08, fH + 0.1]} />
+          <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+        </mesh>
+      ))}
+
+      {Array.from({ length: model3D.floors - 1 }).map((_, i) => (
+        <mesh
+          key={`slab-${i}`}
+          position={[0, FOUNDATION_HEIGHT + (i + 1) * FLOOR_HEIGHT, 0]}
+          receiveShadow
+        >
+          <boxGeometry args={[fW - T * 2, 0.15, fH - T * 2]} />
+          <meshStandardMaterial color="#9b9085" roughness={0.9} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function FlatRoof({
+  floorPlan,
+  top,
+  greenRoof,
+}: {
+  floorPlan: FloorPlan;
+  top: number;
+  greenRoof: boolean;
+}) {
+  const w = floorPlan.width + ROOF_OVERHANG * 2;
+  const d = floorPlan.height + ROOF_OVERHANG * 2;
+  const surface = greenRoof ? sustainabilityAccent.greenRoof : "#5d5e51";
+
+  return (
+    <group position={[0, top, 0]}>
+      <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w, 0.2, d]} />
+        <meshStandardMaterial
+          color={surface}
+          roughness={0.9}
+          emissive={greenRoof ? "#4a8a34" : "#000000"}
+          emissiveIntensity={greenRoof ? 0.9 : 0}
+        />
+      </mesh>
+      <mesh position={[0, 0.34, d / 2 - 0.06]}>
+        <boxGeometry args={[w, 0.28, 0.12]} />
+        <meshStandardMaterial color="#3d3a32" />
+      </mesh>
+      <mesh position={[0, 0.34, -d / 2 + 0.06]}>
+        <boxGeometry args={[w, 0.28, 0.12]} />
+        <meshStandardMaterial color="#3d3a32" />
+      </mesh>
+      <mesh position={[w / 2 - 0.06, 0.34, 0]}>
+        <boxGeometry args={[0.12, 0.28, d]} />
+        <meshStandardMaterial color="#3d3a32" />
+      </mesh>
+      <mesh position={[-w / 2 + 0.06, 0.34, 0]}>
+        <boxGeometry args={[0.12, 0.28, d]} />
+        <meshStandardMaterial color="#3d3a32" />
+      </mesh>
+    </group>
+  );
+}
+
+function GableRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
+  const w = floorPlan.width + ROOF_OVERHANG * 2;
+  const d = floorPlan.height + ROOF_OVERHANG * 2;
+  // Peak proportional to depth so slope reads on the south face
+  const peak = d * 0.38;
+
+  // Shape describes the gable END (south-north cross-section) in XY plane:
+  // X here will map to world Z after rotation, Y stays as world Y.
+  const shape = useMemo(() => {
+    const s = new THREE.Shape();
+    s.moveTo(-d / 2, 0); // south eave
+    s.lineTo(d / 2, 0); // north eave
+    s.lineTo(0, peak); // ridge apex
+    s.lineTo(-d / 2, 0);
+    return s;
+  }, [d, peak]);
+
+  // Rotate -90° around Y: local X → world -Z, local Z → world +X.
+  // With position [-w/2, top, 0] the extrusion runs from x=-w/2 to x=+w/2 (east-west ridge).
+  // Shape x=-d/2 maps to world z=+d/2 (south eave); x=+d/2 maps to z=-d/2 (north eave).
+  return (
+    <group position={[0, top, 0]}>
+      <mesh
+        position={[w / 2, 0, 0]}
+        rotation={[0, -Math.PI / 2, 0]}
+        castShadow
+        receiveShadow
+      >
+        <extrudeGeometry args={[shape, { depth: w, bevelEnabled: false }]} />
+        <meshStandardMaterial color="#4a4339" roughness={0.92} />
+      </mesh>
+      {/* Ridge cap beam running east-west */}
+      <mesh position={[0, peak + 0.05, 0]} castShadow>
+        <boxGeometry args={[w + 0.06, 0.1, 0.2]} />
+        <meshStandardMaterial color="#2f2c25" />
+      </mesh>
+    </group>
+  );
+}
+
+function HipRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
+  const w = floorPlan.width + ROOF_OVERHANG * 2;
+  const d = floorPlan.height + ROOF_OVERHANG * 2;
+  const peak = Math.min(w, d) * 0.32;
+
+  const geometry = useMemo(() => {
+    const halfW = w / 2;
+    const halfD = d / 2;
+    const apex: [number, number, number] = [0, peak, 0];
+    const v0: [number, number, number] = [-halfW, 0, -halfD];
+    const v1: [number, number, number] = [halfW, 0, -halfD];
+    const v2: [number, number, number] = [halfW, 0, halfD];
+    const v3: [number, number, number] = [-halfW, 0, halfD];
+
+    const positions = new Float32Array([
+      ...v0,
+      ...v1,
+      ...apex,
+      ...v1,
+      ...v2,
+      ...apex,
+      ...v2,
+      ...v3,
+      ...apex,
+      ...v3,
+      ...v0,
+      ...apex,
+    ]);
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }, [w, d, peak]);
+
+  return (
+    <mesh position={[0, top, 0]} geometry={geometry} castShadow receiveShadow>
+      <meshStandardMaterial
+        color="#4a4339"
+        side={THREE.DoubleSide}
+        roughness={0.92}
+      />
+    </mesh>
+  );
+}
+
+function ShedRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
+  const w = floorPlan.width + ROOF_OVERHANG * 2;
+  const d = floorPlan.height + ROOF_OVERHANG * 2;
+  const rise = w * 0.18;
+  const angle = Math.atan2(rise, w);
+
+  return (
+    <group position={[0, top, 0]} rotation={[0, 0, angle]}>
+      <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w / Math.cos(angle), 0.2, d]} />
+        <meshStandardMaterial color="#4a4339" roughness={0.92} />
+      </mesh>
+    </group>
+  );
+}
+
+function ButterflyRoof({
+  floorPlan,
+  top,
+}: {
+  floorPlan: FloorPlan;
+  top: number;
+}) {
+  const w = floorPlan.width + ROOF_OVERHANG * 2;
+  const halfW = w / 2;
+  const d = floorPlan.height + ROOF_OVERHANG * 2;
+  const rise = w * 0.1;
+  const angle = Math.atan2(rise, halfW);
+
+  return (
+    <group position={[0, top, 0]}>
+      <group position={[-halfW / 2, 0, 0]} rotation={[0, 0, -angle]}>
+        <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+          <boxGeometry args={[halfW / Math.cos(angle), 0.18, d]} />
+          <meshStandardMaterial color="#4a4339" roughness={0.92} />
+        </mesh>
+      </group>
+      <group position={[halfW / 2, 0, 0]} rotation={[0, 0, angle]}>
+        <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+          <boxGeometry args={[halfW / Math.cos(angle), 0.18, d]} />
+          <meshStandardMaterial color="#4a4339" roughness={0.92} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+function Roof({
+  floorPlan,
+  model3D,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+}) {
+  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
+  const greenRoof = model3D.sustainabilityFeatures.greenRoof;
+  const type: RoofType = model3D.roofType;
+
+  if (type === "gable") return <GableRoof floorPlan={floorPlan} top={top} />;
+  if (type === "hip") return <HipRoof floorPlan={floorPlan} top={top} />;
+  if (type === "shed") return <ShedRoof floorPlan={floorPlan} top={top} />;
+  if (type === "butterfly")
+    return <ButterflyRoof floorPlan={floorPlan} top={top} />;
+  return <FlatRoof floorPlan={floorPlan} top={top} greenRoof={greenRoof} />;
+}
+
+function SolarArray({
+  floorPlan,
+  model3D,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+}) {
+  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
+  const roofD = floorPlan.height + ROOF_OVERHANG * 2;
+  const cols = 4;
+  const rows = 3;
+  const panelW = 1.2;
+  const panelD = 0.78;
+  const gap = 0.08;
+
+  // For gable roof: place array on the south-facing slope.
+  // Peak = roofD * 0.38 (matches GableRoof). South slope runs from eave (z=+roofD/2, y=top)
+  // to ridge (z=0, y=top+peak). Array sits midway: z=roofD/4, y=top+peak/2.
+  const gablePeak = roofD * 0.38;
+  const slopeAngle = Math.atan2(gablePeak, roofD / 2);
+
+  const isGable = model3D.roofType === "gable";
+  const isFlat = model3D.roofType === "flat";
+
+  const posY = isGable ? top + gablePeak * 0.5 : top + 0.32;
+  const posZ = isGable ? roofD / 4 : 0;
+  const tiltX = isGable ? slopeAngle : isFlat ? -0.18 : -0.28;
+
+  const panelMaterial = (
+    <meshStandardMaterial
+      color="#1a232b"
+      metalness={0.55}
+      roughness={0.22}
+      emissive="#4499ff"
+      emissiveIntensity={1.5}
+      toneMapped={false}
+    />
+  );
+
+  return (
+    <group position={[0, posY, posZ]} rotation={[tiltX, 0, 0]}>
+      {Array.from({ length: rows }).map((_, r) =>
+        Array.from({ length: cols }).map((_, c) => (
+          <mesh
+            key={`panel-${r}-${c}`}
+            position={[
+              (c - (cols - 1) / 2) * (panelW + gap),
+              0,
+              (r - (rows - 1) / 2) * (panelD + gap),
+            ]}
+            castShadow
+          >
+            <boxGeometry args={[panelW, 0.05, panelD]} />
+            {panelMaterial}
+          </mesh>
+        )),
+      )}
+      <mesh position={[0, -0.03, 0]}>
+        <boxGeometry
+          args={[
+            cols * panelW + (cols - 1) * gap + 0.4,
+            0.06,
+            rows * panelD + (rows - 1) * gap + 0.4,
+          ]}
+        />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.7} metalness={0.3} />
+      </mesh>
+      {/* Point light beneath the array to cast blue-tinted glow on roof surface */}
+      <pointLight
+        color={sustainabilityAccent.solarPanels}
+        intensity={0.6}
+        distance={5}
+        position={[0, -0.5, 0]}
+      />
+    </group>
+  );
+}
+
+function RainwaterTank({ floorPlan }: { floorPlan: FloorPlan }) {
+  return (
+    <group
+      position={[
+        floorPlan.width / 2 + 1.0,
+        FOUNDATION_HEIGHT + 0.75,
+        floorPlan.height / 2 - 1.6,
+      ]}
+    >
+      <mesh castShadow>
+        <cylinderGeometry args={[0.42, 0.42, 1.5, 28]} />
+        <meshStandardMaterial
+          color={sustainabilityAccent.rainwaterTank}
+          roughness={0.35}
+          metalness={0.3}
+          emissive="#00eeff"
+          emissiveIntensity={1.4}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh position={[0, 0.82, 0]}>
+        <cylinderGeometry args={[0.44, 0.44, 0.1, 28]} />
+        <meshStandardMaterial color="#33606b" />
+      </mesh>
+      <mesh position={[0, -0.78, 0]}>
+        <cylinderGeometry args={[0.46, 0.46, 0.06, 28]} />
+        <meshStandardMaterial color="#33606b" />
+      </mesh>
+      <pointLight
+        color={sustainabilityAccent.rainwaterTank}
+        intensity={0.6}
+        distance={4}
+        position={[0, 0.5, 0]}
+      />
+    </group>
+  );
+}
+
+function PermeableDriveway({ floorPlan }: { floorPlan: FloorPlan }) {
+  const widthM = Math.min(floorPlan.width * 0.34, 5);
+  const depthM = 1.8;
+  const tile = 0.55;
+  const cols = Math.max(1, Math.floor(widthM / tile));
+  const rows = Math.max(1, Math.floor(depthM / tile));
+  const startX = -floorPlan.width * 0.3;
+
+  return (
+    <group position={[startX, 0.02, floorPlan.height / 2 + 1.6]}>
+      {Array.from({ length: rows }).map((_, r) =>
+        Array.from({ length: cols }).map((_, c) => (
+          <mesh
+            key={`tile-${r}-${c}`}
+            position={[
+              (c - (cols - 1) / 2) * tile,
+              0,
+              (r - (rows - 1) / 2) * tile,
+            ]}
+            receiveShadow
+          >
+            <boxGeometry args={[tile * 0.9, 0.04, tile * 0.9]} />
+            <meshStandardMaterial
+              color={
+                (r + c) % 2 === 0
+                  ? sustainabilityAccent.permeableDriveway
+                  : "#7e8a86"
+              }
+              roughness={0.95}
+            />
+          </mesh>
+        )),
+      )}
+    </group>
+  );
+}
+
+function CrossVentilationArrows({
+  floorPlan,
+  model3D,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+}) {
+  // Float above the gable ridge so the arrows are always visible
+  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
+  const roofD = floorPlan.height + ROOF_OVERHANG * 2;
+  const gablePeak = model3D.roofType === "gable" ? roofD * 0.38 : 0.5;
+  const y = top + gablePeak + 1.2;
+  const span = floorPlan.width + 3;
+
+  return (
+    <group position={[0, y, 0]}>
+      <mesh>
+        <boxGeometry args={[span, 0.14, 0.14]} />
+        <meshStandardMaterial
+          color={sustainabilityAccent.crossVentilation}
+          emissive="#aaeeff"
+          emissiveIntensity={1.8}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh position={[span / 2, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+        <coneGeometry args={[0.26, 0.6, 22]} />
+        <meshStandardMaterial
+          color={sustainabilityAccent.crossVentilation}
+          emissive="#aaeeff"
+          emissiveIntensity={1.8}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh position={[-span / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <coneGeometry args={[0.26, 0.6, 22]} />
+        <meshStandardMaterial
+          color={sustainabilityAccent.crossVentilation}
+          emissive="#aaeeff"
+          emissiveIntensity={1.8}
+          toneMapped={false}
+        />
+      </mesh>
+      <pointLight
+        color={sustainabilityAccent.crossVentilation}
+        intensity={0.8}
+        distance={8}
+        position={[0, 0, 0]}
+      />
+    </group>
+  );
+}
+
+function Trees({ floorPlan }: { floorPlan: FloorPlan }) {
+  const positions: Array<[number, number, number, number]> = [
+    [-floorPlan.width / 2 - 1.6, -floorPlan.height / 2 - 1.0, 0.95, 1],
+    [-floorPlan.width / 2 - 2.4, -floorPlan.height / 2 + 1.4, 1.15, 0.88],
+    [floorPlan.width / 2 + 1.4, -floorPlan.height / 2 + 0.4, 0.85, 1.05],
+    [floorPlan.width / 2 + 2.2, floorPlan.height / 2 + 0.6, 1.05, 0.92],
+    [-floorPlan.width / 2 - 1.0, floorPlan.height / 2 + 1.6, 1.0, 1],
+    [floorPlan.width / 2 + 1.6, -floorPlan.height / 2 - 1.7, 0.78, 0.95],
+  ];
+
+  return (
+    <>
+      {positions.map(([x, z, scale, hue], i) => (
+        <group
+          key={`tree-${i}`}
+          position={[x, 0, z]}
+          scale={[scale, scale, scale]}
+        >
+          <mesh position={[0, 0.45, 0]} castShadow>
+            <cylinderGeometry args={[0.08, 0.12, 0.9, 12]} />
+            <meshStandardMaterial color="#6a5236" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 1.15, 0]} castShadow>
+            <sphereGeometry args={[0.5, 16, 16]} />
+            <meshStandardMaterial
+              color={hue > 1 ? "#5b8a4d" : "#6e9a58"}
+              roughness={0.92}
+            />
+          </mesh>
+          <mesh position={[0.18, 1.4, 0.12]} castShadow>
+            <sphereGeometry args={[0.32, 14, 14]} />
+            <meshStandardMaterial color="#79a861" roughness={0.92} />
+          </mesh>
+        </group>
+      ))}
+    </>
+  );
+}
+
+function Ground({ floorPlan }: { floorPlan: FloorPlan }) {
+  const w = floorPlan.width + 12;
+  const d = floorPlan.height + 12;
+  return (
+    <mesh
+      position={[0, -0.01, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      receiveShadow
+    >
+      <planeGeometry args={[w, d]} />
+      <meshStandardMaterial color="#e1d6bf" roughness={1} />
+    </mesh>
+  );
+}
+
+function HomeScene({
+  floorPlan,
+  model3D,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+}) {
+  const features = model3D.sustainabilityFeatures;
+
+  return (
+    <>
+      <ambientLight intensity={0.4} />
+      <directionalLight
+        position={[12, 16, 9]}
+        intensity={1.5}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
+      />
+      <directionalLight position={[-10, 8, -6]} intensity={0.45} />
+
+      <Ground floorPlan={floorPlan} />
+      <Foundation floorPlan={floorPlan} />
+      <WallsWithOpenings floorPlan={floorPlan} model3D={model3D} />
+      <Roof floorPlan={floorPlan} model3D={model3D} />
+
+      {model3D.windows.map((w, i) => (
+        <Window key={`win-${i}`} opening={w} floorPlan={floorPlan} />
+      ))}
+      {model3D.doors.map((d, i) => (
+        <Door key={`door-${i}`} opening={d} floorPlan={floorPlan} />
+      ))}
+
+      {features.solarPanels ? (
+        <SolarArray floorPlan={floorPlan} model3D={model3D} />
+      ) : null}
+      {features.rainwaterTank ? <RainwaterTank floorPlan={floorPlan} /> : null}
+      {features.permeableDriveway ? (
+        <PermeableDriveway floorPlan={floorPlan} />
+      ) : null}
+      {features.crossVentilation ? (
+        <CrossVentilationArrows floorPlan={floorPlan} model3D={model3D} />
+      ) : null}
+      {features.trees ? <Trees floorPlan={floorPlan} /> : null}
+
+      <OrbitControls
+        makeDefault
+        enablePan
+        enableZoom
+        target={[0, FLOOR_HEIGHT * 0.8, 0]}
+        minDistance={10}
+        maxDistance={42}
+      />
+    </>
+  );
+}
+
+export function Home3DPreview({
+  floorPlan,
+  model3D,
+  upgrades,
+  materials,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+  upgrades?: GeneratedHomeConcept["upgrades"];
+  materials?: GeneratedHomeConcept["materials"];
+}) {
+  const activeFeatures = useMemo(
+    () =>
+      (
+        Object.entries(model3D.sustainabilityFeatures) as Array<
+          [keyof Model3D["sustainabilityFeatures"], boolean]
+        >
+      )
+        .filter(([, enabled]) => enabled)
+        .map(([key]) => ({
+          key,
+          label: sustainabilityLabels[key],
+          color: sustainabilityAccent[key],
+        })),
+    [model3D.sustainabilityFeatures],
+  );
+
+  const cameraDistance = Math.max(floorPlan.width, floorPlan.height) * 1.5;
+
+  return (
+    <Card className="overflow-hidden p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+            Generated 3D preview
+          </p>
+          <CardTitle className="mt-2">Your sustainable dream home</CardTitle>
+        </div>
+        <div className="text-sm text-[color:var(--muted)]">
+          {model3D.floors} floor{model3D.floors === 1 ? "" : "s"} ·{" "}
+          {model3D.roofType} roof · {model3D.exteriorColor}
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div
+          className="h-[480px] overflow-hidden rounded-[1.5rem] border border-[color:var(--border)] bg-[linear-gradient(180deg,#f4ecdf,#e8ddca)]"
+          data-testid="home-3d-canvas"
+        >
+          <Canvas
+            shadows
+            camera={{
+              position: [cameraDistance, FLOOR_HEIGHT * 1.4, cameraDistance],
+              fov: 36,
+            }}
+          >
+            <HomeScene floorPlan={floorPlan} model3D={model3D} />
+          </Canvas>
+        </div>
+
+        <aside className="space-y-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+              Sustainability layer
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
+              The highlighted elements below are the upgrades layered onto your
+              dream home concept.
+            </p>
+            <ul className="mt-4 space-y-2">
+              {activeFeatures.map((feature) => (
+                <li
+                  key={feature.key}
+                  className="flex items-center gap-3 rounded-[0.85rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-2 text-sm"
+                >
+                  <span
+                    className="inline-block h-3 w-3 rounded-full"
+                    style={{
+                      backgroundColor: feature.color,
+                      boxShadow: `0 0 8px ${feature.color}`,
+                    }}
+                    aria-hidden
+                  />
+                  <span className="font-semibold text-[color:var(--foreground)]">
+                    {feature.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {upgrades?.length ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                Top upgrades
+              </p>
+              <div className="mt-3 space-y-2">
+                {upgrades.slice(0, 3).map((upgrade) => (
+                  <div
+                    key={upgrade.title}
+                    className="rounded-[1rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] p-3"
+                  >
+                    <p className="text-sm font-semibold text-[color:var(--foreground)]">
+                      {upgrade.title}
+                    </p>
+                    <p className="mt-1 text-xs text-[color:var(--muted)]">
+                      {upgrade.category} · {upgrade.impactLevel} impact
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {materials?.[0] ? (
+            <p className="rounded-[1rem] bg-[color:var(--surface-muted)] p-3 text-sm leading-6 text-[color:var(--muted)]">
+              Material cue:{" "}
+              <span className="font-semibold text-[color:var(--foreground)]">
+                {materials[0].name}
+              </span>
+            </p>
+          ) : null}
+        </aside>
+      </div>
+    </Card>
+  );
+}

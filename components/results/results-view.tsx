@@ -1,6 +1,8 @@
 import { budgetLabels, climateLabels } from "@/lib/domain/constants";
 import type { GeneratedHomeConcept } from "@/lib/domain/types";
 import { formatDate } from "@/lib/utils";
+import { FloorPlan2D } from "@/components/results/floor-plan-2d";
+import { Home3DPreview } from "@/components/results/home-3d-preview";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
 
@@ -202,25 +204,38 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
         </div>
       </section>
 
+      {project.floorPlan && project.model3D ? (
+        <Home3DPreview
+          floorPlan={project.floorPlan}
+          model3D={project.model3D}
+          upgrades={project.upgrades}
+          materials={project.materials}
+        />
+      ) : null}
+
+      {project.floorPlan && project.model3D ? (
+        <FloorPlan2D floorPlan={project.floorPlan} model3D={project.model3D} />
+      ) : null}
+
       <section className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
-        <Card className="p-6">
-          <CardTitle>Design principles</CardTitle>
-          <ul className="mt-4 space-y-3 leading-7 text-[color:var(--foreground)]">
-            {project.designPrinciples.map((principle) => (
-              <li key={principle}>{principle}</li>
-            ))}
-          </ul>
-          {project.styleAnalysis ? (
-            <div className="mt-6 rounded-[1.5rem] bg-[color:var(--surface-muted)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                Inspiration analysis
-              </p>
-              <p className="mt-3 leading-7 text-[color:var(--foreground)]">
-                {project.styleAnalysis.summary}
-              </p>
-            </div>
-          ) : null}
-        </Card>
+          <Card className="p-6">
+            <CardTitle>Design principles</CardTitle>
+            <ul className="mt-4 space-y-3 leading-7 text-[color:var(--foreground)]">
+              {project.designPrinciples.map((principle) => (
+                <li key={principle}>{principle}</li>
+              ))}
+            </ul>
+            {project.styleAnalysis ? (
+              <div className="mt-6 rounded-[1.5rem] bg-[color:var(--surface-muted)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  Inspiration analysis
+                </p>
+                <p className="mt-3 leading-7 text-[color:var(--foreground)]">
+                  {project.styleAnalysis.summary}
+                </p>
+              </div>
+            ) : null}
+          </Card>
 
         <Card className="p-6">
           <CardTitle>Visual prompt starters</CardTitle>

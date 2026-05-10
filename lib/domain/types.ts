@@ -68,6 +68,67 @@ export interface VisualPrompt {
   note: string;
 }
 
+export const floorPlanRoomTypeValues = [
+  "social",
+  "private",
+  "service",
+  "work",
+  "circulation",
+  "outdoor"
+] as const;
+
+export const roofTypeValues = ["flat", "gable", "hip", "shed", "butterfly"] as const;
+
+export const openingWallValues = ["north", "south", "east", "west"] as const;
+
+export type FloorPlanRoomType = (typeof floorPlanRoomTypeValues)[number];
+export type RoofType = (typeof roofTypeValues)[number];
+export type OpeningWall = (typeof openingWallValues)[number];
+
+export interface FloorPlanRoom {
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  floor: number;
+  type: FloorPlanRoomType;
+}
+
+export interface FloorPlan {
+  width: number;
+  height: number;
+  rooms: FloorPlanRoom[];
+}
+
+export interface ModelOpening {
+  wall: OpeningWall;
+  offset: number;
+  width: number;
+  height: number;
+  floor: number;
+  roomName?: string;
+}
+
+export interface SustainabilityFeatures {
+  solarPanels: boolean;
+  greenRoof: boolean;
+  rainwaterTank: boolean;
+  trees: boolean;
+  permeableDriveway: boolean;
+  crossVentilation: boolean;
+}
+
+export interface Model3D {
+  floors: number;
+  roofType: RoofType;
+  wallMaterial: string;
+  exteriorColor: string;
+  windows: ModelOpening[];
+  doors: ModelOpening[];
+  sustainabilityFeatures: SustainabilityFeatures;
+}
+
 export interface GeneratedHomeConcept {
   projectId: string;
   heroTitle: string;
@@ -85,6 +146,20 @@ export interface GeneratedHomeConcept {
   visualPrompts: VisualPrompt[];
   designPrinciples: string[];
   styleAnalysis?: StyleAnalysis | null;
+  floorPlan?: FloorPlan;
+  model3D?: Model3D;
+  materials?: Array<{
+    name: string;
+    reason: string;
+    sustainabilityBenefit: string;
+  }>;
+  upgrades?: Array<{
+    title: string;
+    category: "Energy" | "Water" | "Materials" | "Resilience" | "Comfort";
+    impactLevel: "Low" | "Medium" | "High";
+    explanation: string;
+    estimatedBenefit: string;
+  }>;
   location: string;
   climateRegion: ClimateRegion;
   budgetLevel: BudgetLevel;

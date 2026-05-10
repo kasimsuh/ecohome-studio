@@ -158,21 +158,21 @@ export const sampleStructuredHomeConcept = generatedHomeConceptSchema.parse({
     wallMaterial: "Timber-framed wall assembly with cellulose insulation",
     exteriorColor: "sandstone-beige",
     windows: [
-      { wall: "south", offset: 0.18, width: 1.8, height: 1.5, floor: 0 },
+      { wall: "south", offset: 0.28, width: 1.8, height: 1.5, floor: 0 },
       { wall: "south", offset: 0.48, width: 2.2, height: 1.6, floor: 0 },
-      { wall: "south", offset: 0.8, width: 1.8, height: 1.5, floor: 0 },
+      { wall: "south", offset: 0.68, width: 1.8, height: 1.5, floor: 0 },
       { wall: "north", offset: 0.3, width: 1.4, height: 1.3, floor: 0 },
       { wall: "north", offset: 0.68, width: 1.4, height: 1.3, floor: 0 },
       { wall: "east", offset: 0.25, width: 1.2, height: 1.2, floor: 0 },
       { wall: "west", offset: 0.25, width: 1.2, height: 1.2, floor: 0 },
-      { wall: "south", offset: 0.22, width: 1.5, height: 1.3, floor: 1 },
-      { wall: "south", offset: 0.54, width: 1.5, height: 1.3, floor: 1 },
-      { wall: "south", offset: 0.82, width: 1.4, height: 1.3, floor: 1 },
+      { wall: "south", offset: 0.23, width: 1.5, height: 1.3, floor: 1 },
+      { wall: "south", offset: 0.50, width: 1.5, height: 1.3, floor: 1 },
+      { wall: "south", offset: 0.77, width: 1.4, height: 1.3, floor: 1 },
       { wall: "north", offset: 0.46, width: 1.3, height: 1.2, floor: 1 }
     ],
     doors: [
-      { wall: "south", offset: 0.12, width: 1.1, height: 2.2, floor: 0 },
-      { wall: "south", offset: 0.72, width: 1.8, height: 2.3, floor: 0 }
+      { wall: "south", offset: 0.11, width: 1.1, height: 2.2, floor: 0 },
+      { wall: "south", offset: 0.87, width: 1.8, height: 2.3, floor: 0 }
     ],
     sustainabilityFeatures: {
       solarPanels: true,
