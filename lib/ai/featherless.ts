@@ -14,6 +14,7 @@ import {
   type SourceReference,
   upgradeCategoryValues,
 } from "@/lib/domain/home-concept-schema";
+import { sanitizeHomeGeometry } from "@/lib/domain/home-geometry";
 import {
   budgetLevelValues,
   climateRegionValues,
@@ -967,7 +968,7 @@ function normalizeHomeConceptCandidate(
     );
   }
 
-  return homeConceptSchema.parse(normalized);
+  return homeConceptSchema.parse(sanitizeHomeGeometry(normalized));
 }
 
 function buildMessages(input: GenerateHomeRequest, guidanceSnippets: GuidanceSnippet[]) {
@@ -1003,6 +1004,14 @@ Requirements:
 - windows and doors must be arrays of objects with wall, offset, width, height, floor.
 - wall must be exactly one of: north, south, east, west.
 - offset must be a decimal between 0 and 1, for example 0.25.
+- Openings must fit fully on the named exterior wall and must not hang past wall edges.
+- Doors must be on floor 0 only and should be ground-level exterior entries.
+- Window and door dimensions must be realistic renderable meter values.
+- Windows must be fully visible and must not be hidden behind wall surfaces, roof fascia, floor bands, doors, entry canopies, or other windows.
+- Keep windows below the top of each floor with clear wall space above them.
+- Do not place ground-floor windows so close to doors that their frames overlap.
+- Room x/y/width/height values must stay fully inside floorPlan width and height.
+- Use simple rectangular, house-like massing that can be rendered without floating pieces.
 - sustainabilityFeatures must include booleans for solarPanels, greenRoof, rainwaterTank, trees, permeableDriveway, crossVentilation.
 - upgrades must be an array of objects with title, category, impactLevel, explanation, estimatedBenefit.
 - upgrade category must be exactly one of: Energy, Water, Materials, Resilience, Comfort.

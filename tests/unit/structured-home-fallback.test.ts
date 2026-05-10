@@ -26,6 +26,11 @@ describe("createFallbackStructuredHomeConcept", () => {
     expect(() => generatedHomeConceptSchema.parse(concept)).not.toThrow();
     expect(concept.location).toBe("Toronto, Canada");
     expect(concept.climateType).toBe("cold");
+    expect(concept.model3D.doors.some((door) => door.floor === 0)).toBe(true);
+    expect(concept.model3D.windows.length).toBeGreaterThan(0);
+    expect(
+      concept.model3D.windows.every((window) => window.floor < concept.model3D.floors),
+    ).toBe(true);
     expect(concept.guidanceSnippets).toHaveLength(1);
     expect(concept.sources).toEqual([
       {

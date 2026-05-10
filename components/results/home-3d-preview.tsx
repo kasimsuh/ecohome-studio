@@ -27,6 +27,8 @@ const FOUNDATION_OVERHANG = 0.35;
 const ROOF_OVERHANG = 0.45;
 const WINDOW_SILL = 0.95;
 const WALL_THICKNESS = 0.28;
+const EXTERIOR_REVEAL_DEPTH = 0.05;
+const OPENING_CUTOUT_PADDING = 0.12;
 
 const exteriorColorMap: Record<string, string> = {
   "sandstone-beige": "#dcc8a4",
@@ -71,11 +73,10 @@ const sustainabilityLabels: Record<
   crossVentilation: "Cross ventilation",
 };
 
-function openingTransform(
+export function getOpeningRenderPlacement(
   opening: ModelOpening,
   floorPlan: FloorPlan,
-  isDoor: boolean,
-  outsetDepth: number,
+  isDoor: boolean
 ) {
   const baseY = FOUNDATION_HEIGHT + opening.floor * FLOOR_HEIGHT;
   const sill = isDoor ? 0 : WINDOW_SILL;
@@ -86,7 +87,7 @@ function openingTransform(
   switch (opening.wall) {
     case "south":
       return {
-        position: [alongW, y, floorPlan.height / 2 + outsetDepth] as [
+        position: [alongW, y, floorPlan.height / 2 + EXTERIOR_REVEAL_DEPTH] as [
           number,
           number,
           number,
@@ -95,7 +96,7 @@ function openingTransform(
       };
     case "north":
       return {
-        position: [alongW, y, -floorPlan.height / 2 - outsetDepth] as [
+        position: [alongW, y, -floorPlan.height / 2 - EXTERIOR_REVEAL_DEPTH] as [
           number,
           number,
           number,
@@ -104,7 +105,7 @@ function openingTransform(
       };
     case "east":
       return {
-        position: [floorPlan.width / 2 + outsetDepth, y, alongH] as [
+        position: [floorPlan.width / 2 + EXTERIOR_REVEAL_DEPTH, y, alongH] as [
           number,
           number,
           number,
@@ -114,7 +115,7 @@ function openingTransform(
     case "west":
     default:
       return {
-        position: [-floorPlan.width / 2 - outsetDepth, y, alongH] as [
+        position: [-floorPlan.width / 2 - EXTERIOR_REVEAL_DEPTH, y, alongH] as [
           number,
           number,
           number,
@@ -133,7 +134,7 @@ function Window({
 }) {
   const frameT = 0.08;
   const frameDepth = 0.16;
-  const t = openingTransform(opening, floorPlan, false, -WALL_THICKNESS / 2);
+  const t = getOpeningRenderPlacement(opening, floorPlan, false);
   const w = opening.width;
   const h = opening.height;
 
@@ -198,7 +199,7 @@ function Door({
 }) {
   const frameT = 0.1;
   const frameDepth = 0.18;
-  const t = openingTransform(opening, floorPlan, true, -WALL_THICKNESS / 2);
+  const t = getOpeningRenderPlacement(opening, floorPlan, true);
   const w = opening.width;
   const h = opening.height;
 
@@ -327,23 +328,27 @@ function WallsWithOpenings({
         for (const o of wins) {
           const cx = cfg.holeX(o.offset);
           const cy = WINDOW_SILL + o.height / 2;
+          const holeWidth = o.width + OPENING_CUTOUT_PADDING * 2;
+          const holeHeight = o.height + OPENING_CUTOUT_PADDING * 2;
           const p = new THREE.Path();
-          p.moveTo(cx - o.width / 2, cy - o.height / 2);
-          p.lineTo(cx + o.width / 2, cy - o.height / 2);
-          p.lineTo(cx + o.width / 2, cy + o.height / 2);
-          p.lineTo(cx - o.width / 2, cy + o.height / 2);
-          p.lineTo(cx - o.width / 2, cy - o.height / 2);
+          p.moveTo(cx - holeWidth / 2, cy - holeHeight / 2);
+          p.lineTo(cx + holeWidth / 2, cy - holeHeight / 2);
+          p.lineTo(cx + holeWidth / 2, cy + holeHeight / 2);
+          p.lineTo(cx - holeWidth / 2, cy + holeHeight / 2);
+          p.lineTo(cx - holeWidth / 2, cy - holeHeight / 2);
           shape.holes.push(p);
         }
         for (const o of drs) {
           const cx = cfg.holeX(o.offset);
-          const cy = o.height / 2;
+          const holeWidth = o.width + OPENING_CUTOUT_PADDING * 2;
+          const holeHeight = o.height + OPENING_CUTOUT_PADDING;
+          const cy = holeHeight / 2;
           const p = new THREE.Path();
-          p.moveTo(cx - o.width / 2, cy - o.height / 2);
-          p.lineTo(cx + o.width / 2, cy - o.height / 2);
-          p.lineTo(cx + o.width / 2, cy + o.height / 2);
-          p.lineTo(cx - o.width / 2, cy + o.height / 2);
-          p.lineTo(cx - o.width / 2, cy - o.height / 2);
+          p.moveTo(cx - holeWidth / 2, 0);
+          p.lineTo(cx + holeWidth / 2, 0);
+          p.lineTo(cx + holeWidth / 2, cy + holeHeight / 2);
+          p.lineTo(cx - holeWidth / 2, cy + holeHeight / 2);
+          p.lineTo(cx - holeWidth / 2, 0);
           shape.holes.push(p);
         }
 

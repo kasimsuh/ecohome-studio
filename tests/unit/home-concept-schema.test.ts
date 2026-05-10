@@ -45,4 +45,24 @@ describe("home concept schema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("rejects structured concepts with impossible render geometry", () => {
+    const result = homeConceptSchema.safeParse({
+      ...sampleStructuredHomeConcept,
+      model3D: {
+        ...sampleStructuredHomeConcept.model3D,
+        doors: [
+          {
+            wall: "south",
+            offset: 0.5,
+            width: 1,
+            height: 2.2,
+            floor: 1,
+          },
+        ],
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

@@ -29,6 +29,8 @@ export function SiteBrand({
           src={siteIcon}
           alt=""
           aria-hidden="true"
+          width={64}
+          height={64}
           className="h-[3em] w-[3em] shrink-0 object-contain"
           priority
         />
