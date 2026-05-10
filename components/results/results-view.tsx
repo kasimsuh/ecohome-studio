@@ -18,6 +18,14 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
           model3D={project.model3D}
           upgrades={project.upgrades}
           materials={project.materials}
+          architecturalStyle={project.architecturalStyle}
+          summary={project.summary}
+          location={project.location}
+          climateRegion={project.climateRegion}
+          budgetLevel={project.budgetLevel}
+          visualPrompts={project.visualPrompts}
+          styleAnalysis={project.styleAnalysis}
+          sceneSeed={`${project.projectId}:${project.location}:${project.architecturalStyle}`}
           variant="workspace"
         />
       </main>

@@ -181,7 +181,14 @@ export const sampleStructuredHomeConcept = generatedHomeConceptSchema.parse({
       trees: true,
       permeableDriveway: true,
       crossVentilation: true
-    }
+    },
+    facadeMaterial: "timber-board",
+    roofMaterial: "asphalt-shingle",
+    chimneyCount: 1,
+    hasDeck: true,
+    bodyStyle: "l-shape",
+    dormerCount: 2,
+    roofDesign: "craftsman"
   },
   upgrades: [
     {

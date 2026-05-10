@@ -119,6 +119,28 @@ export interface SustainabilityFeatures {
   crossVentilation: boolean;
 }
 
+export const bodyStyleValues = ["box", "l-shape", "split-level"] as const;
+export type BodyStyle = (typeof bodyStyleValues)[number];
+
+export const facadeMaterialValues = [
+  "timber-board",
+  "brick",
+  "rendered-plaster",
+  "stone-veneer",
+  "metal-panel",
+  "fiber-cement",
+] as const;
+
+export const roofMaterialValues = [
+  "metal-standing-seam",
+  "clay-tile",
+  "asphalt-shingle",
+  "rubber-membrane",
+] as const;
+
+export type FacadeMaterial = (typeof facadeMaterialValues)[number];
+export type RoofMaterial = (typeof roofMaterialValues)[number];
+
 export interface Model3D {
   floors: number;
   roofType: RoofType;
@@ -127,6 +149,13 @@ export interface Model3D {
   windows: ModelOpening[];
   doors: ModelOpening[];
   sustainabilityFeatures: SustainabilityFeatures;
+  facadeMaterial?: FacadeMaterial;
+  roofMaterial?: RoofMaterial;
+  chimneyCount?: 0 | 1 | 2;
+  hasDeck?: boolean;
+  bodyStyle?: BodyStyle;
+  dormerCount?: 0 | 1 | 2 | 3;
+  roofDesign?: "craftsman" | "contemporary" | "traditional";
 }
 
 export interface GeneratedHomeConcept {

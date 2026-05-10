@@ -14,6 +14,7 @@ import { FloorPlanDrawing } from "@/components/results/floor-plan-2d";
 import { Card, CardTitle } from "@/components/ui/card";
 import type {
   FloorPlan,
+  FloorPlanRoom,
   GeneratedHomeConcept,
   Model3D,
   ModelOpening,
@@ -22,13 +23,66 @@ import type {
 import { cn } from "@/lib/utils";
 
 const FLOOR_HEIGHT = 2.7;
-const FOUNDATION_HEIGHT = 0.4;
-const FOUNDATION_OVERHANG = 0.35;
+const FOUNDATION_HEIGHT = 0;
 const ROOF_OVERHANG = 0.45;
 const WINDOW_SILL = 0.95;
 const WALL_THICKNESS = 0.28;
 const EXTERIOR_REVEAL_DEPTH = 0.05;
 const OPENING_CUTOUT_PADDING = 0.12;
+
+type FurnitureKind = "sofa" | "table" | "bed" | "desk" | "cabinet";
+
+type FurniturePlacement = {
+  kind: FurnitureKind;
+  position: [number, number, number];
+  rotationY: number;
+  scale: [number, number, number];
+  color: string;
+};
+
+type ScenePromptContext = {
+  architecturalStyle?: string;
+  summary?: string;
+  location?: string;
+  climateRegion?: GeneratedHomeConcept["climateRegion"];
+  budgetLevel?: GeneratedHomeConcept["budgetLevel"];
+  visualPrompts?: GeneratedHomeConcept["visualPrompts"];
+  styleAnalysis?: GeneratedHomeConcept["styleAnalysis"];
+  materials?: GeneratedHomeConcept["materials"];
+};
+
+type FacadeDetail = "wood-slat" | "stone-base" | "brick-band" | "plaster" | "minimal";
+
+export type SceneStyleProfile = {
+  materialFamily: "wood" | "stone" | "brick" | "plaster" | "glass" | "metal" | "clay" | "neutral";
+  mood: "modern" | "coastal" | "cabin" | "urban" | "minimal" | "warm" | "natural";
+  facadeDetail: FacadeDetail;
+  wallColor: string;
+  wallSecondaryColor: string;
+  wallRoughness: number;
+  wallMetalness: number;
+  trimColor: string;
+  frameColor: string;
+  doorColor: string;
+  roofColor: string;
+  glassColor: string;
+  interiorGlow: string;
+  groundColor: string;
+  hardscapeColor: string;
+  tankColor: string;
+  solarPanelColor: string;
+  solarGridColor: string;
+  arrowColor: string;
+  treePalette: [string, string, string];
+  furniturePalette: {
+    fabric: string;
+    wood: string;
+    bed: string;
+    desk: string;
+    cabinet: string;
+    light: string;
+  };
+};
 
 const exteriorColorMap: Record<string, string> = {
   "sandstone-beige": "#dcc8a4",
@@ -43,10 +97,327 @@ const exteriorColorMap: Record<string, string> = {
   beige: "#dcc8a4",
 };
 
-function resolveExteriorColor(value: string) {
-  if (!value) return "#dcc8a4";
+const colorKeywordMap: Array<[string, string]> = [
+  ["charcoal", "#4d4942"],
+  ["black", "#37332d"],
+  ["cedar", "#a17350"],
+  ["timber", "#b1845a"],
+  ["wood", "#a8794f"],
+  ["clay", "#b98464"],
+  ["terracotta", "#b97455"],
+  ["brick", "#a7654e"],
+  ["sage", "#a3ae8d"],
+  ["green", "#9dad88"],
+  ["white", "#f1ece1"],
+  ["lime", "#eee8d8"],
+  ["plaster", "#e8dfcc"],
+  ["taupe", "#b9aa98"],
+  ["stone", "#b9b2a6"],
+  ["grey", "#bcb6ac"],
+  ["gray", "#bcb6ac"],
+  ["beige", "#dcc8a4"],
+  ["sand", "#dcc8a4"]
+];
+
+function hashString(value: string) {
+  let hash = 2166136261;
+
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
+function seededRandom(seed: string) {
+  let state = hashString(seed) || 1;
+
+  return () => {
+    state = Math.imul(state ^ (state >>> 15), 1 | state);
+    state ^= state + Math.imul(state ^ (state >>> 7), 61 | state);
+    return ((state ^ (state >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function stableMutedColor(value: string) {
+  const hue = hashString(value) % 360;
+  return new THREE.Color().setHSL(hue / 360, 0.18, 0.68).getStyle();
+}
+
+function mixColor(color: string, target: string, amount: number) {
+  return new THREE.Color(color).lerp(new THREE.Color(target), amount).getStyle();
+}
+
+function promptContextText(context: ScenePromptContext) {
+  return [
+    context.architecturalStyle,
+    context.summary,
+    context.location,
+    context.climateRegion,
+    context.budgetLevel,
+    context.styleAnalysis?.aesthetic,
+    context.styleAnalysis?.summary,
+    ...(context.styleAnalysis?.palette ?? []),
+    ...(context.styleAnalysis?.materials ?? []),
+    ...(context.styleAnalysis?.lighting ?? []),
+    ...(context.styleAnalysis?.layoutPatterns ?? []),
+    ...(context.materials?.map((material) => material.name) ?? []),
+    ...(context.materials?.map((material) => material.reason) ?? []),
+    ...(context.visualPrompts?.map((prompt) => prompt.prompt) ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function resolveMood(text: string): SceneStyleProfile["mood"] {
+  if (/\b(coastal|beach|shore|lake|breezy|light-filled)\b/.test(text)) {
+    return "coastal";
+  }
+
+  if (/\b(cabin|cottage|rustic|woodland|forest|mountain)\b/.test(text)) {
+    return "cabin";
+  }
+
+  if (/\b(urban|industrial|loft|townhouse|compact)\b/.test(text)) {
+    return "urban";
+  }
+
+  if (/\b(minimal|minimalist|scandinavian|simple)\b/.test(text)) {
+    return "minimal";
+  }
+
+  if (/\b(modern|contemporary|glass|clean-lined|clean lined)\b/.test(text)) {
+    return "modern";
+  }
+
+  if (/\b(warm|terracotta|clay|earthy|family|inviting)\b/.test(text)) {
+    return "warm";
+  }
+
+  return "natural";
+}
+
+function resolveMaterialFamily(text: string): SceneStyleProfile["materialFamily"] {
+  if (/\b(cedar|timber|wood|bamboo|mass timber)\b/.test(text)) return "wood";
+  if (/\b(stone|limestone|granite|slate|mineral)\b/.test(text)) return "stone";
+  if (/\b(brick|masonry)\b/.test(text)) return "brick";
+  if (/\b(plaster|stucco|lime|render)\b/.test(text)) return "plaster";
+  if (/\b(glass|glazing|clerestory)\b/.test(text)) return "glass";
+  if (/\b(metal|steel|zinc|aluminum|aluminium)\b/.test(text)) return "metal";
+  if (/\b(clay|terracotta|adobe|earth)\b/.test(text)) return "clay";
+  return "neutral";
+}
+
+function facadeDetailFor(
+  materialFamily: SceneStyleProfile["materialFamily"],
+  mood: SceneStyleProfile["mood"],
+): FacadeDetail {
+  if (materialFamily === "wood") return "wood-slat";
+  if (materialFamily === "stone") return "stone-base";
+  if (materialFamily === "brick") return "brick-band";
+  if (materialFamily === "plaster" || materialFamily === "clay") return "plaster";
+  if (mood === "modern" || mood === "minimal" || mood === "urban") return "minimal";
+  return "stone-base";
+}
+
+export function resolveExteriorColor(value: string, wallMaterial = "") {
+  if (!value && !wallMaterial) return "#dcc8a4";
   const key = value.toLowerCase().trim().replace(/\s+/g, "-");
-  return exteriorColorMap[key] ?? "#dcc8a4";
+  const tokenSource = `${value} ${wallMaterial}`.toLowerCase();
+  const keywordColor = colorKeywordMap.find(([keyword]) =>
+    tokenSource.includes(keyword)
+  )?.[1];
+  const baseColor =
+    exteriorColorMap[key] ?? keywordColor ?? stableMutedColor(tokenSource);
+
+  if (/\b(timber|cedar|wood)\b/.test(tokenSource)) {
+    return mixColor(baseColor, "#b1845a", 0.18);
+  }
+
+  if (/\b(stone|brick|mineral|tile)\b/.test(tokenSource)) {
+    return mixColor(baseColor, "#aaa79e", 0.18);
+  }
+
+  if (/\b(plaster|white|lime)\b/.test(tokenSource)) {
+    return mixColor(baseColor, "#f1ece1", 0.22);
+  }
+
+  return baseColor;
+}
+
+export function resolveRoofColor(model3D: Model3D) {
+  if (model3D.sustainabilityFeatures.greenRoof) {
+    return sustainabilityAccent.greenRoof;
+  }
+
+  const source = `${model3D.exteriorColor} ${model3D.wallMaterial}`.toLowerCase();
+
+  if (source.includes("charcoal") || source.includes("black")) {
+    return "#34312c";
+  }
+
+  if (source.includes("cedar") || source.includes("wood") || source.includes("timber")) {
+    return "#5b4938";
+  }
+
+  if (source.includes("white") || source.includes("lime") || source.includes("plaster")) {
+    return "#8c867a";
+  }
+
+  if (model3D.roofType === "flat") {
+    return "#5d5e51";
+  }
+
+  return "#4a4339";
+}
+
+export function resolveSceneStyleProfile(
+  model3D: Model3D,
+  context: ScenePromptContext = {},
+): SceneStyleProfile {
+  const source = `${model3D.exteriorColor} ${model3D.wallMaterial} ${promptContextText(context)}`;
+  const mood = resolveMood(source);
+  const materialFamily = resolveMaterialFamily(source);
+  const baseWallColor = resolveExteriorColor(model3D.exteriorColor, source);
+  const roofColor = resolveRoofColor(model3D);
+
+  const wallColorByMaterial: Record<SceneStyleProfile["materialFamily"], string> = {
+    wood: mixColor(baseWallColor, "#b1845a", 0.24),
+    stone: mixColor(baseWallColor, "#a9a69c", 0.24),
+    brick: mixColor(baseWallColor, "#9d604d", 0.22),
+    plaster: mixColor(baseWallColor, "#eee8d8", 0.26),
+    glass: mixColor(baseWallColor, "#c9d6d1", 0.18),
+    metal: mixColor(baseWallColor, "#8c8f89", 0.16),
+    clay: mixColor(baseWallColor, "#bd7e5e", 0.2),
+    neutral: baseWallColor,
+  };
+  const wallColor = wallColorByMaterial[materialFamily];
+
+  const facadePBRMap: Record<string, { roughness: number; metalness: number }> = {
+    "timber-board":     { roughness: 0.94, metalness: 0 },
+    "brick":            { roughness: 0.97, metalness: 0 },
+    "rendered-plaster": { roughness: 0.88, metalness: 0 },
+    "stone-veneer":     { roughness: 0.96, metalness: 0 },
+    "metal-panel":      { roughness: 0.28, metalness: 0.72 },
+    "fiber-cement":     { roughness: 0.84, metalness: 0 },
+  };
+  const wallPBR = model3D.facadeMaterial
+    ? (facadePBRMap[model3D.facadeMaterial] ?? { roughness: 0.9, metalness: 0.02 })
+    : { roughness: 0.9, metalness: 0.02 };
+
+  const trimBase =
+    mood === "coastal" || mood === "minimal"
+      ? "#efe9dd"
+      : mood === "urban" || mood === "modern"
+        ? "#302d28"
+        : "#4f4639";
+  const frameColor =
+    materialFamily === "wood"
+      ? "#46382b"
+      : mood === "coastal"
+        ? "#f3eadb"
+        : "#272925";
+
+  return {
+    materialFamily,
+    mood,
+    facadeDetail: facadeDetailFor(materialFamily, mood),
+    wallColor,
+    wallSecondaryColor:
+      materialFamily === "wood"
+        ? mixColor(wallColor, "#6f4c32", 0.2)
+        : mixColor(wallColor, "#8d897d", 0.18),
+    wallRoughness: wallPBR.roughness,
+    wallMetalness: wallPBR.metalness,
+    trimColor: trimBase,
+    frameColor,
+    doorColor:
+      materialFamily === "wood" || mood === "cabin"
+        ? "#7a5639"
+        : mood === "modern" || mood === "urban"
+          ? "#4c463d"
+          : "#8a6846",
+    roofColor,
+    glassColor:
+      mood === "coastal"
+        ? "#9fb7b5"
+        : mood === "modern" || materialFamily === "glass"
+          ? "#7d908c"
+          : "#8e9a94",
+    interiorGlow:
+      mood === "modern" || mood === "urban" ? "#f0d0a2" : "#f6ddb6",
+    groundColor:
+      context.climateRegion === "tropical"
+        ? "#c9d1b5"
+        : context.climateRegion === "cold"
+          ? "#d9d4c7"
+          : "#d8ccb6",
+    hardscapeColor:
+      materialFamily === "stone" || mood === "urban" ? "#8f928a" : "#a79b8f",
+    tankColor: mood === "coastal" ? "#7d9698" : "#667a76",
+    solarPanelColor: "#151c22",
+    solarGridColor: "#3a4d58",
+    arrowColor: "#cfe5df",
+    treePalette:
+      context.climateRegion === "tropical"
+        ? ["#3f7445", "#5e8c4f", "#7fa764"]
+        : ["#405f3a", "#587d48", "#78935b"],
+    furniturePalette: {
+      fabric:
+        mood === "coastal"
+          ? "#b8b8a2"
+          : mood === "modern" || mood === "urban"
+            ? "#7d8177"
+            : "#9a8a70",
+      wood: materialFamily === "wood" ? "#8b6847" : "#806144",
+      bed: "#d7c7ad",
+      desk: "#8a928c",
+      cabinet: "#a89e91",
+      light: "#efe6d4",
+    },
+  };
+}
+
+export function createSceneSeed({
+  architecturalStyle,
+  exteriorColor,
+  location,
+  projectId
+}: {
+  architecturalStyle?: string;
+  exteriorColor: string;
+  location?: string;
+  projectId?: string;
+}) {
+  return [projectId, location, architecturalStyle, exteriorColor]
+    .filter(Boolean)
+    .join(":");
+}
+
+export function getRoofPeakHeight(floorPlan: FloorPlan, model3D: Model3D) {
+  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
+  const roofWidth = floorPlan.width + ROOF_OVERHANG * 2;
+  const roofDepth = floorPlan.height + ROOF_OVERHANG * 2;
+
+  if (model3D.roofType === "gable") {
+    return top + roofDepth * 0.38;
+  }
+
+  if (model3D.roofType === "hip") {
+    return top + Math.min(roofWidth, roofDepth) * 0.32;
+  }
+
+  if (model3D.roofType === "shed") {
+    return top + roofWidth * 0.18;
+  }
+
+  if (model3D.roofType === "butterfly") {
+    return top + roofWidth * 0.1;
+  }
+
+  return top + 0.48;
 }
 
 const sustainabilityAccent: Record<
@@ -128,9 +499,11 @@ export function getOpeningRenderPlacement(
 function Window({
   opening,
   floorPlan,
+  profile,
 }: {
   opening: ModelOpening;
   floorPlan: FloorPlan;
+  profile: SceneStyleProfile;
 }) {
   const frameT = 0.08;
   const frameDepth = 0.16;
@@ -142,27 +515,35 @@ function Window({
     <group position={t.position} rotation={[0, t.rotationY, 0]}>
       <mesh position={[0, h / 2 + frameT / 2, 0]}>
         <boxGeometry args={[w + frameT * 2, frameT, frameDepth]} />
-        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
       </mesh>
       <mesh position={[0, -h / 2 - frameT / 2, 0]}>
         <boxGeometry args={[w + frameT * 2, frameT, frameDepth]} />
-        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
       </mesh>
       <mesh position={[-w / 2 - frameT / 2, 0, 0]}>
         <boxGeometry args={[frameT, h, frameDepth]} />
-        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
       </mesh>
       <mesh position={[w / 2 + frameT / 2, 0, 0]}>
         <boxGeometry args={[frameT, h, frameDepth]} />
-        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
       </mesh>
-      {/* Glass pane – physical transmission for real glass look */}
+      <mesh position={[0, 0, -0.035]}>
+        <boxGeometry args={[w * 0.94, h * 0.92, 0.035]} />
+        <meshStandardMaterial
+          color="#1c2422"
+          emissive={profile.interiorGlow}
+          emissiveIntensity={0.08}
+          roughness={0.9}
+        />
+      </mesh>
       <mesh>
         <boxGeometry args={[w, h, 0.04]} />
         <meshPhysicalMaterial
-          color="#c8e8e4"
-          transmission={0.84}
-          roughness={0.04}
+          color={profile.glassColor}
+          transmission={0.32}
+          roughness={0.16}
           metalness={0}
           ior={1.5}
           thickness={0.06}
@@ -171,20 +552,24 @@ function Window({
       {/* Horizontal mid-rail divider */}
       <mesh position={[0, 0, 0.025]}>
         <boxGeometry args={[w, frameT * 0.5, 0.03]} />
-        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
       </mesh>
-      {/* Vertical mid-post divider */}
       <mesh position={[0, 0, 0.025]}>
         <boxGeometry args={[frameT * 0.5, h, 0.03]} />
-        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
       </mesh>
-      {/* Exterior sill – protruding shelf below the frame */}
+      {/* Sill shelf */}
       <mesh
         position={[0, -h / 2 - frameT * 0.6, frameDepth / 2 + 0.06]}
         castShadow
       >
         <boxGeometry args={[w + frameT * 2 + 0.12, 0.06, 0.15]} />
-        <meshStandardMaterial color="#3d3a32" roughness={0.75} />
+        <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
+      </mesh>
+      {/* Header trim above frame – casts a shadow line that reads as architectural depth */}
+      <mesh position={[0, h / 2 + frameT + 0.05, frameDepth / 2 - 0.02]} castShadow>
+        <boxGeometry args={[w + frameT * 2 + 0.14, 0.07, 0.1]} />
+        <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
       </mesh>
     </group>
   );
@@ -193,9 +578,11 @@ function Window({
 function Door({
   opening,
   floorPlan,
+  profile,
 }: {
   opening: ModelOpening;
   floorPlan: FloorPlan;
+  profile: SceneStyleProfile;
 }) {
   const frameT = 0.1;
   const frameDepth = 0.18;
@@ -207,47 +594,53 @@ function Door({
     <group position={t.position} rotation={[0, t.rotationY, 0]}>
       <mesh position={[0, h / 2 + frameT / 2, 0]}>
         <boxGeometry args={[w + frameT * 2, frameT, frameDepth]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.7} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
       </mesh>
       <mesh position={[-w / 2 - frameT / 2, 0, 0]}>
         <boxGeometry args={[frameT, h + frameT, frameDepth]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.7} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
       </mesh>
       <mesh position={[w / 2 + frameT / 2, 0, 0]}>
         <boxGeometry args={[frameT, h + frameT, frameDepth]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.7} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
       </mesh>
       <mesh>
         <boxGeometry args={[w, h, 0.07]} />
-        <meshStandardMaterial color="#7a5b3b" roughness={0.75} />
+        <meshStandardMaterial color={profile.doorColor} roughness={0.78} />
+      </mesh>
+      <mesh position={[0, 0.35, 0.045]}>
+        <boxGeometry args={[w * 0.72, h * 0.02, 0.025]} />
+        <meshStandardMaterial color={mixColor(profile.doorColor, "#2a241d", 0.25)} roughness={0.86} />
+      </mesh>
+      <mesh position={[0, -0.28, 0.045]}>
+        <boxGeometry args={[w * 0.72, h * 0.02, 0.025]} />
+        <meshStandardMaterial color={mixColor(profile.doorColor, "#2a241d", 0.25)} roughness={0.86} />
       </mesh>
       <mesh position={[w * 0.32, 0, 0.05]}>
         <sphereGeometry args={[0.05, 12, 12]} />
         <meshStandardMaterial color="#c8a86a" metalness={0.6} roughness={0.3} />
       </mesh>
+      <mesh position={[0, -h / 2 - 0.045, 0.16]} receiveShadow>
+        <boxGeometry args={[w + 0.36, 0.09, 0.34]} />
+        <meshStandardMaterial color={profile.hardscapeColor} roughness={0.92} />
+      </mesh>
     </group>
   );
 }
 
-function Foundation({ floorPlan }: { floorPlan: FloorPlan }) {
-  const w = floorPlan.width + FOUNDATION_OVERHANG * 2;
-  const d = floorPlan.height + FOUNDATION_OVERHANG * 2;
-  return (
-    <mesh position={[0, FOUNDATION_HEIGHT / 2, 0]} receiveShadow castShadow>
-      <boxGeometry args={[w, FOUNDATION_HEIGHT, d]} />
-      <meshStandardMaterial color="#9b9085" roughness={0.95} />
-    </mesh>
-  );
-}
 
 function WallsWithOpenings({
   floorPlan,
   model3D,
+  profile,
+  sceneSeed,
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
+  profile: SceneStyleProfile;
+  sceneSeed: string;
 }) {
-  const color = resolveExteriorColor(model3D.exteriorColor);
+  const color = profile.wallColor;
   const T = WALL_THICKNESS;
   const fW = floorPlan.width;
   const fH = floorPlan.height;
@@ -374,9 +767,11 @@ function WallsWithOpenings({
           castShadow
           receiveShadow
         >
-          <meshStandardMaterial color={color} roughness={0.85} />
+          <meshStandardMaterial color={color} roughness={profile.wallRoughness} metalness={profile.wallMetalness} />
         </mesh>
       ))}
+
+      <FacadeDetails floorPlan={floorPlan} model3D={model3D} profile={profile} sceneSeed={sceneSeed} />
 
       {Array.from({ length: Math.max(0, model3D.floors - 1) }).map((_, i) => (
         <mesh
@@ -384,7 +779,7 @@ function WallsWithOpenings({
           position={[0, FOUNDATION_HEIGHT + (i + 1) * FLOOR_HEIGHT, 0]}
         >
           <boxGeometry args={[fW + 0.1, 0.08, fH + 0.1]} />
-          <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
         </mesh>
       ))}
 
@@ -395,25 +790,255 @@ function WallsWithOpenings({
           receiveShadow
         >
           <boxGeometry args={[fW - T * 2, 0.15, fH - T * 2]} />
-          <meshStandardMaterial color="#9b9085" roughness={0.9} />
+          <meshStandardMaterial color={profile.hardscapeColor} roughness={0.92} />
         </mesh>
       ))}
     </group>
   );
 }
 
+function CornerBoards({
+  floorPlan,
+  model3D,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+  profile: SceneStyleProfile;
+}) {
+  const fW = floorPlan.width;
+  const fH = floorPlan.height;
+  const totalH = model3D.floors * FLOOR_HEIGHT + 0.06;
+  const midY = FOUNDATION_HEIGHT + totalH / 2;
+  const d = 0.1;
+  const corners: [number, number][] = [
+    [fW / 2 + d / 2, fH / 2 + d / 2],
+    [-fW / 2 - d / 2, fH / 2 + d / 2],
+    [fW / 2 + d / 2, -fH / 2 - d / 2],
+    [-fW / 2 - d / 2, -fH / 2 - d / 2],
+  ];
+  return (
+    <>
+      {corners.map(([x, z], i) => (
+        <mesh key={`corner-${i}`} position={[x, midY, z]} castShadow receiveShadow>
+          <boxGeometry args={[d, totalH, d]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
+function FacadeDetails({
+  floorPlan,
+  model3D,
+  profile,
+  sceneSeed,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+  profile: SceneStyleProfile;
+  sceneSeed: string;
+}) {
+  const fW = floorPlan.width;
+  const fH = floorPlan.height;
+  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
+  const wallH = top - FOUNDATION_HEIGHT;
+  const fm = model3D.facadeMaterial;
+
+  const facadeGeometry = useMemo(() => {
+    if (fm === "timber-board") {
+      const spacing = 0.22;
+      const count = Math.floor(wallH / spacing);
+      const boards = [];
+      for (let i = 0; i < count; i++) {
+        const y = FOUNDATION_HEIGHT + i * spacing + spacing / 2;
+        boards.push(
+          <mesh key={`tb-s-${i}`} position={[0, y, fH / 2 + 0.016]} castShadow>
+            <boxGeometry args={[fW + 0.02, 0.014, 0.022]} />
+            <meshStandardMaterial color={mixColor(profile.wallSecondaryColor, "#2a1e14", 0.18)} roughness={0.94} />
+          </mesh>,
+          <mesh key={`tb-n-${i}`} position={[0, y, -fH / 2 - 0.016]} castShadow>
+            <boxGeometry args={[fW + 0.02, 0.014, 0.022]} />
+            <meshStandardMaterial color={mixColor(profile.wallSecondaryColor, "#2a1e14", 0.18)} roughness={0.94} />
+          </mesh>,
+          <mesh key={`tb-e-${i}`} position={[fW / 2 + 0.016, y, 0]} castShadow>
+            <boxGeometry args={[0.022, 0.014, fH + 0.02]} />
+            <meshStandardMaterial color={mixColor(profile.wallSecondaryColor, "#2a1e14", 0.18)} roughness={0.94} />
+          </mesh>,
+          <mesh key={`tb-w-${i}`} position={[-fW / 2 - 0.016, y, 0]} castShadow>
+            <boxGeometry args={[0.022, 0.014, fH + 0.02]} />
+            <meshStandardMaterial color={mixColor(profile.wallSecondaryColor, "#2a1e14", 0.18)} roughness={0.94} />
+          </mesh>,
+        );
+      }
+      return boards;
+    }
+
+    if (fm === "brick") {
+      const courseH = 0.085;
+      const count = Math.floor(wallH / courseH);
+      const groutColor = mixColor(profile.wallColor, "#1a1612", 0.3);
+      const courses = [];
+      for (let i = 0; i < count; i++) {
+        const y = FOUNDATION_HEIGHT + i * courseH;
+        courses.push(
+          <mesh key={`br-s-${i}`} position={[0, y, fH / 2 + 0.014]}>
+            <boxGeometry args={[fW + 0.02, 0.011, 0.018]} />
+            <meshStandardMaterial color={groutColor} roughness={0.97} />
+          </mesh>,
+          <mesh key={`br-n-${i}`} position={[0, y, -fH / 2 - 0.014]}>
+            <boxGeometry args={[fW + 0.02, 0.011, 0.018]} />
+            <meshStandardMaterial color={groutColor} roughness={0.97} />
+          </mesh>,
+          <mesh key={`br-e-${i}`} position={[fW / 2 + 0.014, y, 0]}>
+            <boxGeometry args={[0.018, 0.011, fH + 0.02]} />
+            <meshStandardMaterial color={groutColor} roughness={0.97} />
+          </mesh>,
+          <mesh key={`br-w-${i}`} position={[-fW / 2 - 0.014, y, 0]}>
+            <boxGeometry args={[0.018, 0.011, fH + 0.02]} />
+            <meshStandardMaterial color={groutColor} roughness={0.97} />
+          </mesh>,
+        );
+      }
+      return courses;
+    }
+
+    if (fm === "stone-veneer") {
+      const random = seededRandom(`${sceneSeed}:stone`);
+      const stoneColor = mixColor(profile.wallColor, "#5a5248", 0.3);
+      const stones = [];
+      let xPos = -fW / 2;
+      let idx = 0;
+      while (xPos < fW / 2) {
+        const stoneW = 0.18 + random() * 0.22;
+        if (xPos + stoneW > fW / 2) break;
+        const cx = xPos + stoneW / 2;
+        stones.push(
+          <mesh key={`sv-${idx}`} position={[cx, FOUNDATION_HEIGHT + wallH / 2, fH / 2 + 0.018]} castShadow>
+            <boxGeometry args={[stoneW - 0.014, wallH, 0.025]} />
+            <meshStandardMaterial color={stoneColor} roughness={0.96} />
+          </mesh>,
+          <mesh key={`sv-n-${idx}`} position={[cx, FOUNDATION_HEIGHT + wallH / 2, -fH / 2 - 0.018]} castShadow>
+            <boxGeometry args={[stoneW - 0.014, wallH, 0.025]} />
+            <meshStandardMaterial color={stoneColor} roughness={0.96} />
+          </mesh>,
+        );
+        xPos += stoneW;
+        idx++;
+      }
+      return stones;
+    }
+
+    if (fm === "metal-panel") {
+      const panelW = 0.9;
+      const seamColor = "#2a2d2b";
+      const count = Math.floor(fW / panelW) + 1;
+      const seams = [];
+      for (let i = 0; i < count; i++) {
+        const x = -fW / 2 + i * panelW;
+        seams.push(
+          <mesh key={`mp-s-${i}`} position={[x, FOUNDATION_HEIGHT + wallH / 2, fH / 2 + 0.016]} castShadow>
+            <boxGeometry args={[0.025, wallH, 0.028]} />
+            <meshStandardMaterial color={seamColor} metalness={0.6} roughness={0.35} />
+          </mesh>,
+          <mesh key={`mp-n-${i}`} position={[x, FOUNDATION_HEIGHT + wallH / 2, -fH / 2 - 0.016]} castShadow>
+            <boxGeometry args={[0.025, wallH, 0.028]} />
+            <meshStandardMaterial color={seamColor} metalness={0.6} roughness={0.35} />
+          </mesh>,
+        );
+      }
+      return seams;
+    }
+
+    if (fm === "fiber-cement") {
+      const spacing = 0.28;
+      const count = Math.floor(wallH / spacing);
+      const bands = [];
+      for (let i = 0; i < count; i++) {
+        const y = FOUNDATION_HEIGHT + i * spacing + spacing / 2;
+        bands.push(
+          <mesh key={`fc-s-${i}`} position={[0, y, fH / 2 + 0.015]}>
+            <boxGeometry args={[fW + 0.02, 0.009, 0.016]} />
+            <meshStandardMaterial color={profile.wallSecondaryColor} roughness={0.84} />
+          </mesh>,
+          <mesh key={`fc-n-${i}`} position={[0, y, -fH / 2 - 0.015]}>
+            <boxGeometry args={[fW + 0.02, 0.009, 0.016]} />
+            <meshStandardMaterial color={profile.wallSecondaryColor} roughness={0.84} />
+          </mesh>,
+        );
+      }
+      return bands;
+    }
+
+    if (fm === "rendered-plaster") {
+      return [
+        <mesh key="rp-cornice" position={[0, top - 0.16, fH / 2 + 0.022]} castShadow>
+          <boxGeometry args={[fW + 0.12, 0.1, 0.055]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.82} />
+        </mesh>,
+        <mesh key="rp-base" position={[0, FOUNDATION_HEIGHT + 0.14, fH / 2 + 0.022]} castShadow>
+          <boxGeometry args={[fW + 0.12, 0.28, 0.055]} />
+          <meshStandardMaterial color={mixColor(profile.wallColor, "#3a3428", 0.14)} roughness={0.88} />
+        </mesh>,
+      ];
+    }
+
+    // Fallback: subtle base band
+    return [
+      <mesh key="fb-band" position={[0, FOUNDATION_HEIGHT + 0.42, fH / 2 + 0.018]} castShadow receiveShadow>
+        <boxGeometry args={[fW + 0.08, 0.58, 0.045]} />
+        <meshStandardMaterial color={profile.wallSecondaryColor} roughness={0.94} />
+      </mesh>,
+    ];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fm, fW, fH, wallH, top, FOUNDATION_HEIGHT, profile.wallColor, profile.wallSecondaryColor, profile.trimColor, sceneSeed]);
+
+  return (
+    <group>
+      {facadeGeometry}
+      <CornerBoards floorPlan={floorPlan} model3D={model3D} profile={profile} />
+    </group>
+  );
+}
+
+function resolveRoofDesign(
+  model3D: Model3D,
+  sceneSeed: string,
+): "craftsman" | "contemporary" | "traditional" {
+  if (model3D.roofDesign) return model3D.roofDesign;
+  const r = seededRandom(`${sceneSeed}:roofDesign`);
+  const opts = ["craftsman", "contemporary", "traditional"] as const;
+  return opts[Math.floor(r() * 3)] ?? "traditional";
+}
+
+function resolveRoofMaterialConfig(roofMaterial?: string, fallbackColor?: string) {
+  const configs: Record<string, { color: string; roughness: number; metalness: number }> = {
+    "metal-standing-seam": { color: "#5a5e60", roughness: 0.28, metalness: 0.72 },
+    "clay-tile":           { color: "#9b5c3e", roughness: 0.95, metalness: 0 },
+    "asphalt-shingle":     { color: "#4a4339", roughness: 0.92, metalness: 0 },
+    "rubber-membrane":     { color: "#3a3a3a", roughness: 0.88, metalness: 0 },
+  };
+  return configs[roofMaterial ?? ""] ?? { color: fallbackColor ?? "#6a6560", roughness: 0.92, metalness: 0 };
+}
+
 function FlatRoof({
   floorPlan,
   top,
   greenRoof,
+  roofColor,
+  roofMaterial,
 }: {
   floorPlan: FloorPlan;
   top: number;
   greenRoof: boolean;
+  roofColor: string;
+  roofMaterial?: string;
 }) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
-  const surface = greenRoof ? sustainabilityAccent.greenRoof : "#5d5e51";
+  const matCfg = resolveRoofMaterialConfig(roofMaterial, roofColor);
+  const surface = greenRoof ? sustainabilityAccent.greenRoof : matCfg.color;
 
   return (
     <group position={[0, top, 0]}>
@@ -421,9 +1046,10 @@ function FlatRoof({
         <boxGeometry args={[w, 0.2, d]} />
         <meshStandardMaterial
           color={surface}
-          roughness={0.9}
-          emissive={greenRoof ? "#4a8a34" : "#000000"}
-          emissiveIntensity={greenRoof ? 0.9 : 0}
+          roughness={greenRoof ? 0.9 : matCfg.roughness}
+          metalness={greenRoof ? 0 : matCfg.metalness}
+          emissive={greenRoof ? "#2f5f2c" : "#000000"}
+          emissiveIntensity={greenRoof ? 0.12 : 0}
         />
       </mesh>
       <mesh position={[0, 0.34, d / 2 - 0.06]}>
@@ -446,131 +1072,352 @@ function FlatRoof({
   );
 }
 
-function GableRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
+function GableRoof({
+  floorPlan,
+  top,
+  roofColor,
+  roofMaterial,
+  roofDesign,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  top: number;
+  roofColor: string;
+  roofMaterial?: string;
+  roofDesign: "craftsman" | "contemporary" | "traditional";
+  profile: SceneStyleProfile;
+}) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
-  // Peak proportional to depth so slope reads on the south face
   const peak = d * 0.38;
+  const matCfg = resolveRoofMaterialConfig(roofMaterial, roofColor);
+  const slopeLen = Math.sqrt((d / 2) ** 2 + peak ** 2);
+  const slopeAngle = Math.atan2(peak, d / 2);
 
-  // Shape describes the gable END (south-north cross-section) in XY plane:
-  // X here will map to world Z after rotation, Y stays as world Y.
+  const fasciaH = roofDesign === "craftsman" ? 0.28 : roofDesign === "contemporary" ? 0.1 : 0.2;
+  const fasciaColor = mixColor(profile.trimColor, "#1a1612", 0.55);
+  const soffitColor = mixColor(profile.wallColor, "#f4f0e8", 0.5);
+  const gutterColor = "#363330";
+
   const shape = useMemo(() => {
     const s = new THREE.Shape();
-    s.moveTo(-d / 2, 0); // south eave
-    s.lineTo(d / 2, 0); // north eave
-    s.lineTo(0, peak); // ridge apex
+    s.moveTo(-d / 2, 0);
+    s.lineTo(d / 2, 0);
+    s.lineTo(0, peak);
     s.lineTo(-d / 2, 0);
     return s;
   }, [d, peak]);
 
-  // Rotate -90° around Y: local X → world -Z, local Z → world +X.
-  // With position [-w/2, top, 0] the extrusion runs from x=-w/2 to x=+w/2 (east-west ridge).
-  // Shape x=-d/2 maps to world z=+d/2 (south eave); x=+d/2 maps to z=-d/2 (north eave).
+  const seamPositions = useMemo(() => {
+    if (roofMaterial !== "metal-standing-seam") return [];
+    const spacing = 0.9;
+    const count = Math.floor(w / spacing);
+    return Array.from({ length: count }, (_, i) => -w / 2 + i * spacing + spacing / 2);
+  }, [roofMaterial, w]);
+
+  const tileRows = useMemo(() => {
+    if (roofMaterial !== "clay-tile" && roofMaterial !== "asphalt-shingle") return [];
+    const isClay = roofMaterial === "clay-tile";
+    const spacing = isClay ? 0.34 : 0.25;
+    const count = Math.ceil(slopeLen / spacing);
+    return Array.from({ length: count }, (_, i) => (i + 0.5) / count);
+  }, [roofMaterial, slopeLen]);
+  const tileRowH = roofMaterial === "clay-tile" ? 0.042 : 0.016;
+  const tileRowD = roofMaterial === "clay-tile" ? 0.072 : 0.036;
+  const tileRowColor =
+    roofMaterial === "clay-tile"
+      ? mixColor(matCfg.color, "#1e0e06", 0.22)
+      : mixColor(matCfg.color, "#0a0a0a", 0.2);
+
+  const rafterXs = useMemo(() => {
+    if (roofDesign !== "craftsman") return [];
+    const spacing = 0.55;
+    const count = Math.floor(w / spacing);
+    return Array.from({ length: count }, (_, i) => -w / 2 + i * spacing + spacing / 2);
+  }, [roofDesign, w]);
+
+  const dentalXs = useMemo(() => {
+    if (roofDesign !== "traditional") return [];
+    const spacing = 0.3;
+    const count = Math.floor(w / spacing);
+    return Array.from({ length: count }, (_, i) => -w / 2 + i * spacing + spacing / 2);
+  }, [roofDesign, w]);
+
+  const fasciaTop = 0.05;
+  const fasciaBot = fasciaTop - fasciaH;
+  const gutterY = fasciaBot - 0.04;
+
   return (
     <group position={[0, top, 0]}>
-      <mesh
-        position={[w / 2, 0, 0]}
-        rotation={[0, -Math.PI / 2, 0]}
-        castShadow
-        receiveShadow
-      >
+      {/* Main roof surface */}
+      <mesh position={[w / 2, 0, 0]} rotation={[0, -Math.PI / 2, 0]} castShadow receiveShadow>
         <extrudeGeometry args={[shape, { depth: w, bevelEnabled: false }]} />
-        <meshStandardMaterial color="#4a4339" roughness={0.92} />
+        <meshStandardMaterial color={matCfg.color} roughness={matCfg.roughness} metalness={matCfg.metalness} />
       </mesh>
-      {/* Ridge cap beam running east-west */}
+
+      {/* Tile / shingle courses — south slope */}
+      {tileRows.map((f, i) => (
+        <mesh key={`row-s-${i}`} position={[0, f * peak, (d / 2) * (1 - f)]} castShadow>
+          <boxGeometry args={[w + 0.04, tileRowH, tileRowD]} />
+          <meshStandardMaterial color={tileRowColor} roughness={0.9} />
+        </mesh>
+      ))}
+      {/* Tile / shingle courses — north slope */}
+      {tileRows.map((f, i) => (
+        <mesh key={`row-n-${i}`} position={[0, f * peak, -(d / 2) * (1 - f)]} castShadow>
+          <boxGeometry args={[w + 0.04, tileRowH, tileRowD]} />
+          <meshStandardMaterial color={tileRowColor} roughness={0.9} />
+        </mesh>
+      ))}
+
+      {/* Metal seam lines — south slope */}
+      {seamPositions.map((x, i) => (
+        <mesh key={`seam-s-${i}`} position={[x, peak / 2, d / 4]} rotation={[slopeAngle - Math.PI / 2, 0, 0]} castShadow>
+          <boxGeometry args={[0.022, slopeLen, 0.025]} />
+          <meshStandardMaterial color="#2a2d2b" metalness={0.65} roughness={0.3} />
+        </mesh>
+      ))}
+      {/* Metal seam lines — north slope */}
+      {seamPositions.map((x, i) => (
+        <mesh key={`seam-n-${i}`} position={[x, peak / 2, -d / 4]} rotation={[Math.PI / 2 - slopeAngle, 0, 0]} castShadow>
+          <boxGeometry args={[0.022, slopeLen, 0.025]} />
+          <meshStandardMaterial color="#2a2d2b" metalness={0.65} roughness={0.3} />
+        </mesh>
+      ))}
+
+      {/* Ridge cap */}
       <mesh position={[0, peak + 0.05, 0]} castShadow>
-        <boxGeometry args={[w + 0.06, 0.1, 0.2]} />
-        <meshStandardMaterial color="#2f2c25" />
+        <boxGeometry args={[w + 0.06, 0.12, 0.22]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.84} />
       </mesh>
-      {/* Eave fascia boards – south and north edges */}
-      <mesh position={[0, 0.09, d / 2]} castShadow>
-        <boxGeometry args={[w + 0.06, 0.2, 0.09]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+
+      {/* Rake boards — east gable */}
+      <mesh position={[w / 2 + 0.05, peak / 2, d / 4]} rotation={[slopeAngle - Math.PI / 2, 0, 0]} castShadow>
+        <boxGeometry args={[0.09, slopeLen, 0.08]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
       </mesh>
-      <mesh position={[0, 0.09, -d / 2]} castShadow>
-        <boxGeometry args={[w + 0.06, 0.2, 0.09]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      <mesh position={[w / 2 + 0.05, peak / 2, -d / 4]} rotation={[Math.PI / 2 - slopeAngle, 0, 0]} castShadow>
+        <boxGeometry args={[0.09, slopeLen, 0.08]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
       </mesh>
+      {/* Rake boards — west gable */}
+      <mesh position={[-(w / 2 + 0.05), peak / 2, d / 4]} rotation={[slopeAngle - Math.PI / 2, 0, 0]} castShadow>
+        <boxGeometry args={[0.09, slopeLen, 0.08]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
+      </mesh>
+      <mesh position={[-(w / 2 + 0.05), peak / 2, -d / 4]} rotation={[Math.PI / 2 - slopeAngle, 0, 0]} castShadow>
+        <boxGeometry args={[0.09, slopeLen, 0.08]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
+      </mesh>
+
+      {/* Fascia boards */}
+      <mesh position={[0, fasciaTop - fasciaH / 2, d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, fasciaH, 0.09]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
+      </mesh>
+      <mesh position={[0, fasciaTop - fasciaH / 2, -d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, fasciaH, 0.09]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
+      </mesh>
+
+      {/* Soffits — south and north overhangs */}
+      <mesh position={[0, -0.025, d / 2 - ROOF_OVERHANG / 2]} receiveShadow>
+        <boxGeometry args={[w, 0.05, ROOF_OVERHANG]} />
+        <meshStandardMaterial color={soffitColor} roughness={0.9} />
+      </mesh>
+      <mesh position={[0, -0.025, -(d / 2 - ROOF_OVERHANG / 2)]} receiveShadow>
+        <boxGeometry args={[w, 0.05, ROOF_OVERHANG]} />
+        <meshStandardMaterial color={soffitColor} roughness={0.9} />
+      </mesh>
+
+      {/* Gutters */}
+      <mesh position={[0, gutterY, d / 2 + 0.04]} castShadow>
+        <boxGeometry args={[w + 0.04, 0.08, 0.08]} />
+        <meshStandardMaterial color={gutterColor} metalness={0.44} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, gutterY, -(d / 2 + 0.04)]} castShadow>
+        <boxGeometry args={[w + 0.04, 0.08, 0.08]} />
+        <meshStandardMaterial color={gutterColor} metalness={0.44} roughness={0.5} />
+      </mesh>
+
+      {/* Craftsman: exposed rafter tails */}
+      {rafterXs.map((x, i) => (
+        <mesh key={`rafter-s-${i}`} position={[x, -0.07, d / 2 + 0.06]} castShadow>
+          <boxGeometry args={[0.12, 0.14, 0.34]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.86} />
+        </mesh>
+      ))}
+      {rafterXs.map((x, i) => (
+        <mesh key={`rafter-n-${i}`} position={[x, -0.07, -(d / 2 + 0.06)]} castShadow>
+          <boxGeometry args={[0.12, 0.14, 0.34]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.86} />
+        </mesh>
+      ))}
+
+      {/* Traditional: dental molding */}
+      {dentalXs.map((x, i) => (
+        <mesh key={`dental-s-${i}`} position={[x, fasciaTop - fasciaH / 2, d / 2 + 0.05]}>
+          <boxGeometry args={[0.11, 0.09, 0.06]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.82} />
+        </mesh>
+      ))}
+      {dentalXs.map((x, i) => (
+        <mesh key={`dental-n-${i}`} position={[x, fasciaTop - fasciaH / 2, -(d / 2 + 0.05)]}>
+          <boxGeometry args={[0.11, 0.09, 0.06]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.82} />
+        </mesh>
+      ))}
     </group>
   );
 }
 
-function HipRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
+function HipRoof({
+  floorPlan,
+  top,
+  roofColor,
+  roofMaterial,
+  roofDesign,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  top: number;
+  roofColor: string;
+  roofMaterial?: string;
+  roofDesign: "craftsman" | "contemporary" | "traditional";
+  profile: SceneStyleProfile;
+}) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
   const peak = Math.min(w, d) * 0.32;
+  const ridgeHalfLen = Math.max(w - d, 0) / 2;
+  const matCfg = resolveRoofMaterialConfig(roofMaterial, roofColor);
+
+  const fasciaH = roofDesign === "craftsman" ? 0.26 : roofDesign === "contemporary" ? 0.1 : 0.18;
+  const fasciaColor = mixColor(profile.trimColor, "#1a1612", 0.55);
+  const soffitColor = mixColor(profile.wallColor, "#f4f0e8", 0.5);
+  const gutterColor = "#363330";
 
   const geometry = useMemo(() => {
     const halfW = w / 2;
     const halfD = d / 2;
-    const apex: [number, number, number] = [0, peak, 0];
+    const r0: [number, number, number] = [-ridgeHalfLen, peak, 0];
+    const r1: [number, number, number] = [ridgeHalfLen, peak, 0];
     const v0: [number, number, number] = [-halfW, 0, -halfD];
     const v1: [number, number, number] = [halfW, 0, -halfD];
     const v2: [number, number, number] = [halfW, 0, halfD];
     const v3: [number, number, number] = [-halfW, 0, halfD];
-
+    // South trapezoid, north trapezoid, west hip, east hip
     const positions = new Float32Array([
-      ...v0,
-      ...v1,
-      ...apex,
-      ...v1,
-      ...v2,
-      ...apex,
-      ...v2,
-      ...v3,
-      ...apex,
-      ...v3,
-      ...v0,
-      ...apex,
+      ...v3, ...v2, ...r1,
+      ...v3, ...r1, ...r0,
+      ...v1, ...v0, ...r0,
+      ...v1, ...r0, ...r1,
+      ...v0, ...v3, ...r0,
+      ...v2, ...v1, ...r1,
     ]);
-
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geo.computeVertexNormals();
     return geo;
-  }, [w, d, peak]);
+  }, [w, d, peak, ridgeHalfLen]);
+
+  const fasciaTop = 0.05;
+  const fasciaBot = fasciaTop - fasciaH;
+  const gutterY = fasciaBot - 0.04;
 
   return (
     <group position={[0, top, 0]}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshStandardMaterial
-          color="#4a4339"
-          side={THREE.DoubleSide}
-          roughness={0.92}
-        />
+        <meshStandardMaterial color={matCfg.color} side={THREE.DoubleSide} roughness={matCfg.roughness} metalness={matCfg.metalness} />
       </mesh>
-      {/* Eave fascia – all 4 edges */}
-      <mesh position={[0, 0.05, d / 2]} castShadow>
-        <boxGeometry args={[w + 0.06, 0.18, 0.09]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+
+      {/* Ridge cap (only when ridgeHalfLen > 0) */}
+      {ridgeHalfLen > 0 && (
+        <mesh position={[0, peak + 0.05, 0]} castShadow>
+          <boxGeometry args={[ridgeHalfLen * 2 + 0.12, 0.12, 0.22]} />
+          <meshStandardMaterial color={fasciaColor} roughness={0.84} />
+        </mesh>
+      )}
+
+      {/* Fascia — all 4 eave edges */}
+      <mesh position={[0, fasciaTop - fasciaH / 2, d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, fasciaH, 0.09]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
       </mesh>
-      <mesh position={[0, 0.05, -d / 2]} castShadow>
-        <boxGeometry args={[w + 0.06, 0.18, 0.09]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      <mesh position={[0, fasciaTop - fasciaH / 2, -d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, fasciaH, 0.09]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
       </mesh>
-      <mesh position={[w / 2, 0.05, 0]} castShadow>
-        <boxGeometry args={[0.09, 0.18, d]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      <mesh position={[w / 2, fasciaTop - fasciaH / 2, 0]} castShadow>
+        <boxGeometry args={[0.09, fasciaH, d]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
       </mesh>
-      <mesh position={[-w / 2, 0.05, 0]} castShadow>
-        <boxGeometry args={[0.09, 0.18, d]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      <mesh position={[-w / 2, fasciaTop - fasciaH / 2, 0]} castShadow>
+        <boxGeometry args={[0.09, fasciaH, d]} />
+        <meshStandardMaterial color={fasciaColor} roughness={0.82} />
+      </mesh>
+
+      {/* Soffits — all 4 overhangs */}
+      <mesh position={[0, -0.025, d / 2 - ROOF_OVERHANG / 2]} receiveShadow>
+        <boxGeometry args={[w, 0.05, ROOF_OVERHANG]} />
+        <meshStandardMaterial color={soffitColor} roughness={0.9} />
+      </mesh>
+      <mesh position={[0, -0.025, -(d / 2 - ROOF_OVERHANG / 2)]} receiveShadow>
+        <boxGeometry args={[w, 0.05, ROOF_OVERHANG]} />
+        <meshStandardMaterial color={soffitColor} roughness={0.9} />
+      </mesh>
+      <mesh position={[w / 2 - ROOF_OVERHANG / 2, -0.025, 0]} receiveShadow>
+        <boxGeometry args={[ROOF_OVERHANG, 0.05, floorPlan.height]} />
+        <meshStandardMaterial color={soffitColor} roughness={0.9} />
+      </mesh>
+      <mesh position={[-(w / 2 - ROOF_OVERHANG / 2), -0.025, 0]} receiveShadow>
+        <boxGeometry args={[ROOF_OVERHANG, 0.05, floorPlan.height]} />
+        <meshStandardMaterial color={soffitColor} roughness={0.9} />
+      </mesh>
+
+      {/* Gutters — all 4 eaves */}
+      <mesh position={[0, gutterY, d / 2 + 0.04]} castShadow>
+        <boxGeometry args={[w + 0.04, 0.08, 0.08]} />
+        <meshStandardMaterial color={gutterColor} metalness={0.44} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, gutterY, -(d / 2 + 0.04)]} castShadow>
+        <boxGeometry args={[w + 0.04, 0.08, 0.08]} />
+        <meshStandardMaterial color={gutterColor} metalness={0.44} roughness={0.5} />
+      </mesh>
+      <mesh position={[w / 2 + 0.04, gutterY, 0]} castShadow>
+        <boxGeometry args={[0.08, 0.08, d + 0.04]} />
+        <meshStandardMaterial color={gutterColor} metalness={0.44} roughness={0.5} />
+      </mesh>
+      <mesh position={[-(w / 2 + 0.04), gutterY, 0]} castShadow>
+        <boxGeometry args={[0.08, 0.08, d + 0.04]} />
+        <meshStandardMaterial color={gutterColor} metalness={0.44} roughness={0.5} />
       </mesh>
     </group>
   );
 }
 
-function ShedRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
+function ShedRoof({
+  floorPlan,
+  top,
+  roofColor,
+  roofMaterial,
+}: {
+  floorPlan: FloorPlan;
+  top: number;
+  roofColor: string;
+  roofMaterial?: string;
+}) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
   const rise = w * 0.18;
   const angle = Math.atan2(rise, w);
+  const matCfg = resolveRoofMaterialConfig(roofMaterial, roofColor);
 
   return (
     <group position={[0, top, 0]} rotation={[0, 0, angle]}>
       <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
         <boxGeometry args={[w / Math.cos(angle), 0.2, d]} />
-        <meshStandardMaterial color="#4a4339" roughness={0.92} />
+        <meshStandardMaterial color={matCfg.color} roughness={matCfg.roughness} metalness={matCfg.metalness} />
       </mesh>
     </group>
   );
@@ -579,28 +1426,33 @@ function ShedRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
 function ButterflyRoof({
   floorPlan,
   top,
+  roofColor,
+  roofMaterial,
 }: {
   floorPlan: FloorPlan;
   top: number;
+  roofColor: string;
+  roofMaterial?: string;
 }) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const halfW = w / 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
   const rise = w * 0.1;
   const angle = Math.atan2(rise, halfW);
+  const matCfg = resolveRoofMaterialConfig(roofMaterial, roofColor);
 
   return (
     <group position={[0, top, 0]}>
       <group position={[-halfW / 2, 0, 0]} rotation={[0, 0, -angle]}>
         <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
           <boxGeometry args={[halfW / Math.cos(angle), 0.18, d]} />
-          <meshStandardMaterial color="#4a4339" roughness={0.92} />
+          <meshStandardMaterial color={matCfg.color} roughness={matCfg.roughness} metalness={matCfg.metalness} />
         </mesh>
       </group>
       <group position={[halfW / 2, 0, 0]} rotation={[0, 0, angle]}>
         <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
           <boxGeometry args={[halfW / Math.cos(angle), 0.18, d]} />
-          <meshStandardMaterial color="#4a4339" roughness={0.92} />
+          <meshStandardMaterial color={matCfg.color} roughness={matCfg.roughness} metalness={matCfg.metalness} />
         </mesh>
       </group>
     </group>
@@ -610,28 +1462,51 @@ function ButterflyRoof({
 function Roof({
   floorPlan,
   model3D,
+  profile,
+  sceneSeed,
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
+  profile: SceneStyleProfile;
+  sceneSeed: string;
 }) {
   const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
   const greenRoof = model3D.sustainabilityFeatures.greenRoof;
   const type: RoofType = model3D.roofType;
+  const roofColor = profile.roofColor;
+  const rd = resolveRoofDesign(model3D, sceneSeed);
 
-  if (type === "gable") return <GableRoof floorPlan={floorPlan} top={top} />;
-  if (type === "hip") return <HipRoof floorPlan={floorPlan} top={top} />;
-  if (type === "shed") return <ShedRoof floorPlan={floorPlan} top={top} />;
+  const rm = model3D.roofMaterial;
+  if (type === "gable") {
+    return <GableRoof floorPlan={floorPlan} top={top} roofColor={roofColor} roofMaterial={rm} roofDesign={rd} profile={profile} />;
+  }
+  if (type === "hip") {
+    return <HipRoof floorPlan={floorPlan} top={top} roofColor={roofColor} roofMaterial={rm} roofDesign={rd} profile={profile} />;
+  }
+  if (type === "shed") {
+    return <ShedRoof floorPlan={floorPlan} top={top} roofColor={roofColor} roofMaterial={rm} />;
+  }
   if (type === "butterfly")
-    return <ButterflyRoof floorPlan={floorPlan} top={top} />;
-  return <FlatRoof floorPlan={floorPlan} top={top} greenRoof={greenRoof} />;
+    return <ButterflyRoof floorPlan={floorPlan} top={top} roofColor={roofColor} roofMaterial={rm} />;
+  return (
+    <FlatRoof
+      floorPlan={floorPlan}
+      top={top}
+      greenRoof={greenRoof}
+      roofColor={roofColor}
+      roofMaterial={rm}
+    />
+  );
 }
 
 function SolarArray({
   floorPlan,
   model3D,
+  profile,
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
+  profile: SceneStyleProfile;
 }) {
   const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
   const roofD = floorPlan.height + ROOF_OVERHANG * 2;
@@ -656,12 +1531,11 @@ function SolarArray({
 
   const panelMaterial = (
     <meshStandardMaterial
-      color="#1a232b"
-      metalness={0.55}
-      roughness={0.22}
-      emissive="#4499ff"
-      emissiveIntensity={1.5}
-      toneMapped={false}
+      color={profile.solarPanelColor}
+      metalness={0.48}
+      roughness={0.34}
+      emissive="#05080a"
+      emissiveIntensity={0.04}
     />
   );
 
@@ -691,58 +1565,82 @@ function SolarArray({
             rows * panelD + (rows - 1) * gap + 0.4,
           ]}
         />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.7} metalness={0.3} />
+        <meshStandardMaterial
+          color={profile.solarGridColor}
+          roughness={0.64}
+          metalness={0.32}
+        />
       </mesh>
-      {/* Point light beneath the array to cast blue-tinted glow on roof surface */}
-      <pointLight
-        color={sustainabilityAccent.solarPanels}
-        intensity={0.6}
-        distance={5}
-        position={[0, -0.5, 0]}
-      />
     </group>
   );
 }
 
-function RainwaterTank({ floorPlan }: { floorPlan: FloorPlan }) {
+export function getRainwaterTankPlacement(floorPlan: FloorPlan, sceneSeed: string) {
+  const random = seededRandom(`${sceneSeed}:rainwater`);
+  const options: Array<[number, number]> = [
+    [floorPlan.width / 2 + 1.0, floorPlan.height / 2 - 1.6],
+    [floorPlan.width / 2 + 1.2, -floorPlan.height / 2 + 1.3],
+    [-floorPlan.width / 2 - 1.1, floorPlan.height / 2 - 1.4],
+    [-floorPlan.width / 2 - 1.2, -floorPlan.height / 2 + 1.1],
+  ];
+  const [x, z] = options[Math.floor(random() * options.length)] ?? options[0];
+
+  return {
+    position: [
+      x + (random() - 0.5) * 0.45,
+      0.75,
+      z + (random() - 0.5) * 0.45,
+    ] as [number, number, number],
+  };
+}
+
+function RainwaterTank({
+  floorPlan,
+  sceneSeed,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  sceneSeed: string;
+  profile: SceneStyleProfile;
+}) {
+  const placement = useMemo(
+    () => getRainwaterTankPlacement(floorPlan, sceneSeed),
+    [floorPlan, sceneSeed],
+  );
+
   return (
-    <group
-      position={[
-        floorPlan.width / 2 + 1.0,
-        FOUNDATION_HEIGHT + 0.75,
-        floorPlan.height / 2 - 1.6,
-      ]}
-    >
+    <group position={placement.position}>
       <mesh castShadow>
         <cylinderGeometry args={[0.42, 0.42, 1.5, 28]} />
         <meshStandardMaterial
-          color={sustainabilityAccent.rainwaterTank}
-          roughness={0.35}
-          metalness={0.3}
-          emissive="#00eeff"
-          emissiveIntensity={1.4}
-          toneMapped={false}
+          color={profile.tankColor}
+          roughness={0.52}
+          metalness={0.22}
         />
       </mesh>
       <mesh position={[0, 0.82, 0]}>
         <cylinderGeometry args={[0.44, 0.44, 0.1, 28]} />
-        <meshStandardMaterial color="#33606b" />
+        <meshStandardMaterial color={mixColor(profile.tankColor, "#29312f", 0.3)} />
       </mesh>
       <mesh position={[0, -0.78, 0]}>
         <cylinderGeometry args={[0.46, 0.46, 0.06, 28]} />
-        <meshStandardMaterial color="#33606b" />
+        <meshStandardMaterial color={mixColor(profile.tankColor, "#29312f", 0.3)} />
       </mesh>
-      <pointLight
-        color={sustainabilityAccent.rainwaterTank}
-        intensity={0.6}
-        distance={4}
-        position={[0, 0.5, 0]}
-      />
+      <mesh position={[0, 0.2, 0.44]} castShadow>
+        <boxGeometry args={[0.12, 0.08, 0.08]} />
+        <meshStandardMaterial color="#4b4a42" roughness={0.68} metalness={0.3} />
+      </mesh>
     </group>
   );
 }
 
-function PermeableDriveway({ floorPlan }: { floorPlan: FloorPlan }) {
+function PermeableDriveway({
+  floorPlan,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  profile: SceneStyleProfile;
+}) {
   const widthM = Math.min(floorPlan.width * 0.34, 5);
   const depthM = 1.8;
   const tile = 0.55;
@@ -767,8 +1665,8 @@ function PermeableDriveway({ floorPlan }: { floorPlan: FloorPlan }) {
             <meshStandardMaterial
               color={
                 (r + c) % 2 === 0
-                  ? sustainabilityAccent.permeableDriveway
-                  : "#7e8a86"
+                  ? profile.hardscapeColor
+                  : mixColor(profile.hardscapeColor, "#5f6a62", 0.24)
               }
               roughness={0.95}
             />
@@ -779,75 +1677,362 @@ function PermeableDriveway({ floorPlan }: { floorPlan: FloorPlan }) {
   );
 }
 
-function CrossVentilationArrows({
-  floorPlan,
-  model3D,
-}: {
-  floorPlan: FloorPlan;
-  model3D: Model3D;
-}) {
-  // Float above the gable ridge so the arrows are always visible
-  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
-  const roofD = floorPlan.height + ROOF_OVERHANG * 2;
-  const gablePeak = model3D.roofType === "gable" ? roofD * 0.38 : 0.5;
-  const y = top + gablePeak + 1.2;
-  const span = floorPlan.width + 3;
+function roomCenter(room: FloorPlanRoom, floorPlan: FloorPlan): [number, number, number] {
+  return [
+    room.x + room.width / 2 - floorPlan.width / 2,
+    FOUNDATION_HEIGHT + room.floor * FLOOR_HEIGHT + 0.08,
+    room.y + room.height / 2 - floorPlan.height / 2,
+  ];
+}
+
+function roomRotation(room: FloorPlanRoom) {
+  return room.width >= room.height ? 0 : Math.PI / 2;
+}
+
+export function getFurniturePlacements(
+  floorPlan: FloorPlan,
+  sceneSeed: string,
+  profile?: SceneStyleProfile,
+) {
+  const random = seededRandom(`${sceneSeed}:furniture`);
+  const placements: FurniturePlacement[] = [];
+  const palette = profile?.furniturePalette ?? {
+    fabric: "#8f9f7a",
+    wood: "#9b7655",
+    bed: "#d8c7a7",
+    desk: "#8ba7a8",
+    cabinet: "#b7aea2",
+    light: "#eee8d8",
+  };
+
+  floorPlan.rooms
+    .filter((room) => room.type !== "outdoor" && room.type !== "circulation")
+    .slice(0, 18)
+    .forEach((room, index) => {
+      const [x, y, z] = roomCenter(room, floorPlan);
+      const rotationY = roomRotation(room);
+      const jitterX = (random() - 0.5) * Math.min(room.width * 0.12, 0.45);
+      const jitterZ = (random() - 0.5) * Math.min(room.height * 0.12, 0.45);
+      const roomScale = Math.min(room.width, room.height);
+
+      if (room.type === "social") {
+        placements.push({
+          kind: "sofa",
+          position: [x + jitterX, y + 0.18, z - Math.min(room.height * 0.16, 0.6) + jitterZ],
+          rotationY,
+          scale: [Math.min(room.width * 0.26, 1.7), 0.36, 0.5],
+          color: index % 2 === 0 ? palette.fabric : mixColor(palette.fabric, "#8a6c51", 0.2),
+        });
+        placements.push({
+          kind: "table",
+          position: [x - jitterX * 0.5, y + 0.16, z + Math.min(room.height * 0.12, 0.45)],
+          rotationY,
+          scale: [Math.min(room.width * 0.16, 0.95), 0.18, 0.48],
+          color: palette.wood,
+        });
+      } else if (room.type === "private") {
+        placements.push({
+          kind: "bed",
+          position: [x + jitterX, y + 0.24, z + jitterZ],
+          rotationY,
+          scale: [Math.min(room.width * 0.32, 1.65), 0.3, Math.min(room.height * 0.32, 1.55)],
+          color: palette.bed,
+        });
+      } else if (room.type === "work") {
+        placements.push({
+          kind: "desk",
+          position: [x + jitterX, y + 0.2, z + jitterZ],
+          rotationY,
+          scale: [Math.min(room.width * 0.3, 1.25), 0.28, 0.5],
+          color: palette.desk,
+        });
+      } else if (room.type === "service") {
+        placements.push({
+          kind: "cabinet",
+          position: [x + jitterX, y + 0.28, z + jitterZ],
+          rotationY,
+          scale: [Math.min(room.width * 0.34, 1.42), 0.48, Math.max(0.3, roomScale * 0.14)],
+          color: palette.cabinet,
+        });
+      }
+    });
+
+  return placements;
+}
+
+function FurnitureItem({ item }: { item: FurniturePlacement }) {
+  if (item.kind === "sofa") {
+    return (
+      <group position={item.position} rotation={[0, item.rotationY, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={item.scale} />
+          <meshStandardMaterial color={item.color} roughness={0.78} />
+        </mesh>
+        <mesh position={[0, item.scale[1] * 0.55, -item.scale[2] * 0.45]} castShadow>
+          <boxGeometry args={[item.scale[0], item.scale[1] * 0.85, item.scale[2] * 0.18]} />
+          <meshStandardMaterial color={mixColor(item.color, "#4f5a45", 0.16)} roughness={0.82} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (item.kind === "table") {
+    return (
+      <group position={item.position} rotation={[0, item.rotationY, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={item.scale} />
+          <meshStandardMaterial color={item.color} roughness={0.74} />
+        </mesh>
+        <mesh position={[0, -item.scale[1] * 0.85, 0]} castShadow>
+          <boxGeometry args={[item.scale[0] * 0.72, item.scale[1] * 0.8, item.scale[2] * 0.08]} />
+          <meshStandardMaterial color="#5b5146" roughness={0.84} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (item.kind === "bed") {
+    return (
+      <group position={item.position} rotation={[0, item.rotationY, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={item.scale} />
+          <meshStandardMaterial color={item.color} roughness={0.85} />
+        </mesh>
+        <mesh position={[0, item.scale[1] * 0.55, -item.scale[2] * 0.32]} castShadow>
+          <boxGeometry args={[item.scale[0] * 0.82, item.scale[1] * 0.35, item.scale[2] * 0.24]} />
+          <meshStandardMaterial color="#efe6d4" roughness={0.9} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (item.kind === "desk") {
+    return (
+      <group position={item.position} rotation={[0, item.rotationY, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={item.scale} />
+          <meshStandardMaterial color={item.color} roughness={0.72} />
+        </mesh>
+        <mesh position={[item.scale[0] * 0.38, -item.scale[1] * 0.8, 0]} castShadow>
+          <boxGeometry args={[0.16, item.scale[1] * 1.6, item.scale[2] * 0.7]} />
+          <meshStandardMaterial color="#6b6258" roughness={0.88} />
+        </mesh>
+      </group>
+    );
+  }
 
   return (
-    <group position={[0, y, 0]}>
-      <mesh>
-        <boxGeometry args={[span, 0.14, 0.14]} />
-        <meshStandardMaterial
-          color={sustainabilityAccent.crossVentilation}
-          emissive="#aaeeff"
-          emissiveIntensity={1.8}
-          toneMapped={false}
-        />
+    <group position={item.position} rotation={[0, item.rotationY, 0]}>
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={item.scale} />
+        <meshStandardMaterial color={item.color} roughness={0.86} />
       </mesh>
-      <mesh position={[span / 2, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-        <coneGeometry args={[0.26, 0.6, 22]} />
-        <meshStandardMaterial
-          color={sustainabilityAccent.crossVentilation}
-          emissive="#aaeeff"
-          emissiveIntensity={1.8}
-          toneMapped={false}
-        />
+      <mesh position={[0, item.scale[1] * 0.52, 0]} castShadow>
+        <boxGeometry args={[item.scale[0] * 0.92, item.scale[1] * 0.1, item.scale[2] * 0.92]} />
+        <meshStandardMaterial color="#d4cab8" roughness={0.8} />
       </mesh>
-      <mesh position={[-span / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <coneGeometry args={[0.26, 0.6, 22]} />
-        <meshStandardMaterial
-          color={sustainabilityAccent.crossVentilation}
-          emissive="#aaeeff"
-          emissiveIntensity={1.8}
-          toneMapped={false}
-        />
-      </mesh>
-      <pointLight
-        color={sustainabilityAccent.crossVentilation}
-        intensity={0.8}
-        distance={8}
-        position={[0, 0, 0]}
-      />
     </group>
   );
 }
 
-function Trees({ floorPlan }: { floorPlan: FloorPlan }) {
-  const positions: Array<[number, number, number, number]> = [
-    [-floorPlan.width / 2 - 1.6, -floorPlan.height / 2 - 1.0, 0.95, 1],
-    [-floorPlan.width / 2 - 2.4, -floorPlan.height / 2 + 1.4, 1.15, 0.88],
-    [floorPlan.width / 2 + 1.4, -floorPlan.height / 2 + 0.4, 0.85, 1.05],
-    [floorPlan.width / 2 + 2.2, floorPlan.height / 2 + 0.6, 1.05, 0.92],
-    [-floorPlan.width / 2 - 1.0, floorPlan.height / 2 + 1.6, 1.0, 1],
-    [floorPlan.width / 2 + 1.6, -floorPlan.height / 2 - 1.7, 0.78, 0.95],
-  ];
+function InteriorFurniture({
+  floorPlan,
+  sceneSeed,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  sceneSeed: string;
+  profile: SceneStyleProfile;
+}) {
+  const furniture = useMemo(
+    () => getFurniturePlacements(floorPlan, sceneSeed, profile),
+    [floorPlan, sceneSeed, profile],
+  );
 
   return (
     <>
-      {positions.map(([x, z, scale, hue], i) => {
-        const dark = hue > 1 ? "#4a7a40" : "#5b8a4d";
-        const mid = hue > 1 ? "#5b8a4d" : "#6e9a58";
-        const light = "#79a861";
+      {furniture.map((item, index) => (
+        <FurnitureItem key={`furniture-${index}`} item={item} />
+      ))}
+    </>
+  );
+}
+
+function CrossVentilationArrows({
+  floorPlan,
+  model3D,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+  profile: SceneStyleProfile;
+}) {
+  // Float above the true roof peak so the arrows are always visible.
+  const y = getCrossVentilationArrowHeight(floorPlan, model3D);
+  const span = floorPlan.width + 3;
+
+  return (
+    <group position={[0, y, 0]} renderOrder={4}>
+      <mesh>
+        <boxGeometry args={[span, 0.035, 0.035]} />
+        <meshStandardMaterial
+          color={profile.arrowColor}
+          transparent
+          opacity={0.62}
+          roughness={0.55}
+        />
+      </mesh>
+      <mesh position={[span / 2, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+        <coneGeometry args={[0.16, 0.38, 18]} />
+        <meshStandardMaterial
+          color={profile.arrowColor}
+          transparent
+          opacity={0.62}
+          roughness={0.55}
+        />
+      </mesh>
+      <mesh position={[-span / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <coneGeometry args={[0.16, 0.38, 18]} />
+        <meshStandardMaterial
+          color={profile.arrowColor}
+          transparent
+          opacity={0.62}
+          roughness={0.55}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+export function getCrossVentilationArrowHeight(floorPlan: FloorPlan, model3D: Model3D) {
+  return getRoofPeakHeight(floorPlan, model3D) + 1.2;
+}
+
+interface BlockedRect {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+function getBuildingBlockedRects(
+  floorPlan: FloorPlan,
+  model3D: Model3D | undefined,
+  sceneSeed: string,
+  buffer = 0.9,
+): BlockedRect[] {
+  const rects: BlockedRect[] = [
+    {
+      minX: -floorPlan.width / 2 - buffer,
+      maxX: floorPlan.width / 2 + buffer,
+      minZ: -floorPlan.height / 2 - buffer,
+      maxZ: floorPlan.height / 2 + buffer,
+    },
+  ];
+  if (!model3D) return rects;
+
+  const style = resolveBodyStyle(model3D, sceneSeed);
+
+  if (style === "l-shape") {
+    const r = seededRandom(`${sceneSeed}:bodyVol`);
+    const s = r() > 0.5 ? 1 : -1;
+    const wW = 2.4 + r() * 1.4;
+    const wD = floorPlan.height * (0.52 + r() * 0.2);
+    const cx = s * (floorPlan.width / 2 + wW / 2);
+    const cz = -(floorPlan.height / 2 - wD / 2);
+    rects.push({
+      minX: cx - wW / 2 - buffer,
+      maxX: cx + wW / 2 + buffer,
+      minZ: cz - wD / 2 - buffer,
+      maxZ: cz + wD / 2 + buffer,
+    });
+  } else if (style === "split-level") {
+    const r = seededRandom(`${sceneSeed}:bodyVol`);
+    const s = r() > 0.5 ? 1 : -1;
+    const aW = floorPlan.width * (0.28 + r() * 0.16);
+    const aD = 1.1 + r() * 0.85;
+    const cx = s * (floorPlan.width / 2 - aW / 2);
+    const southFace = floorPlan.height / 2;
+    rects.push({
+      minX: cx - aW / 2 - buffer,
+      maxX: cx + aW / 2 + buffer,
+      minZ: southFace - buffer,
+      maxZ: southFace + aD + buffer,
+    });
+  }
+
+  return rects;
+}
+
+export function getTreePlacements(floorPlan: FloorPlan, sceneSeed: string, model3D?: Model3D) {
+  const random = seededRandom(`${sceneSeed}:trees`);
+  const count = 4 + Math.floor(random() * 4);
+  const blocked = getBuildingBlockedRects(floorPlan, model3D, sceneSeed);
+  const insideAny = (x: number, z: number) =>
+    blocked.some((r) => x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ);
+
+  const zones: Array<() => [number, number]> = [
+    () => [
+      -floorPlan.width / 2 - (1.1 + random() * 1.7),
+      -floorPlan.height / 2 - (0.8 + random() * 1.4),
+    ],
+    () => [
+      -floorPlan.width / 2 - (1.2 + random() * 1.9),
+      -floorPlan.height / 2 + random() * floorPlan.height,
+    ],
+    () => [
+      floorPlan.width / 2 + (1.1 + random() * 1.7),
+      -floorPlan.height / 2 + random() * floorPlan.height,
+    ],
+    () => [
+      -floorPlan.width / 2 + random() * floorPlan.width,
+      floorPlan.height / 2 + (1.0 + random() * 1.5),
+    ],
+    () => [
+      floorPlan.width / 2 + (1.1 + random() * 1.8),
+      floorPlan.height / 2 - random() * 2.6,
+    ],
+  ];
+
+  return Array.from({ length: count }).map((_, index) => {
+    let x: number, z: number;
+    let attempts = 0;
+    do {
+      [x, z] = zones[index % zones.length]();
+      attempts++;
+    } while (insideAny(x!, z!) && attempts < 6);
+
+    return {
+      x: x!,
+      z: z!,
+      scale: 0.78 + random() * 0.42,
+      hue: 0.85 + random() * 0.35,
+    };
+  });
+}
+
+function Trees({
+  floorPlan,
+  sceneSeed,
+  profile,
+  model3D,
+}: {
+  floorPlan: FloorPlan;
+  sceneSeed: string;
+  profile: SceneStyleProfile;
+  model3D?: Model3D;
+}) {
+  const positions = useMemo(
+    () => getTreePlacements(floorPlan, sceneSeed, model3D),
+    [floorPlan, sceneSeed, model3D],
+  );
+
+  return (
+    <>
+      {positions.map(({ x, z, scale, hue }, i) => {
+        const dark = hue > 1 ? profile.treePalette[0] : profile.treePalette[1];
+        const mid = hue > 1 ? profile.treePalette[1] : profile.treePalette[2];
+        const light = mixColor(profile.treePalette[2], "#d0c48f", 0.12);
         return (
           <group
             key={`tree-${i}`}
@@ -865,23 +2050,23 @@ function Trees({ floorPlan }: { floorPlan: FloorPlan }) {
             </mesh>
             {/* Canopy – 5 overlapping spheres for organic silhouette */}
             <mesh position={[0, 1.15, 0]} castShadow receiveShadow>
-              <sphereGeometry args={[0.52, 14, 14]} />
+              <sphereGeometry args={[0.52, 10, 9]} />
               <meshStandardMaterial color={dark} roughness={0.93} />
             </mesh>
             <mesh position={[-0.28, 1.38, 0.18]} castShadow>
-              <sphereGeometry args={[0.38, 12, 12]} />
+              <sphereGeometry args={[0.38, 9, 8]} />
               <meshStandardMaterial color={mid} roughness={0.92} />
             </mesh>
             <mesh position={[0.3, 1.45, -0.15]} castShadow>
-              <sphereGeometry args={[0.36, 12, 12]} />
+              <sphereGeometry args={[0.36, 9, 8]} />
               <meshStandardMaterial color={mid} roughness={0.92} />
             </mesh>
             <mesh position={[0.1, 1.72, 0.08]} castShadow>
-              <sphereGeometry args={[0.3, 12, 12]} />
+              <sphereGeometry args={[0.3, 8, 7]} />
               <meshStandardMaterial color={light} roughness={0.91} />
             </mesh>
             <mesh position={[-0.12, 1.9, -0.1]} castShadow>
-              <sphereGeometry args={[0.22, 10, 10]} />
+              <sphereGeometry args={[0.22, 8, 7]} />
               <meshStandardMaterial color={light} roughness={0.9} />
             </mesh>
           </group>
@@ -891,7 +2076,13 @@ function Trees({ floorPlan }: { floorPlan: FloorPlan }) {
   );
 }
 
-function Ground({ floorPlan }: { floorPlan: FloorPlan }) {
+function Ground({
+  floorPlan,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  profile: SceneStyleProfile;
+}) {
   const w = floorPlan.width + 12;
   const d = floorPlan.height + 12;
   return (
@@ -901,7 +2092,7 @@ function Ground({ floorPlan }: { floorPlan: FloorPlan }) {
       receiveShadow
     >
       <planeGeometry args={[w, d]} />
-      <meshStandardMaterial color="#e1d6bf" roughness={1} />
+      <meshStandardMaterial color={profile.groundColor} roughness={1} />
     </mesh>
   );
 }
@@ -909,9 +2100,11 @@ function Ground({ floorPlan }: { floorPlan: FloorPlan }) {
 function EntryCanopy({
   floorPlan,
   model3D,
+  profile,
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
+  profile: SceneStyleProfile;
 }) {
   const door = model3D.doors.find((d) => d.wall === "south" && d.floor === 0);
   if (!door) return null;
@@ -932,7 +2125,7 @@ function EntryCanopy({
         position={[0, slabT / 2, canopyProtrude / 2]}
       >
         <boxGeometry args={[canopyW, slabT, canopyProtrude]} />
-        <meshStandardMaterial color="#3d3a32" roughness={0.78} />
+        <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
       </mesh>
       {/* Left support post */}
       <mesh
@@ -940,7 +2133,7 @@ function EntryCanopy({
         position={[-(canopyW / 2 - 0.07), -postH / 2, canopyProtrude - 0.05]}
       >
         <boxGeometry args={[0.09, postH, 0.09]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.85} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.85} />
       </mesh>
       {/* Right support post */}
       <mesh
@@ -948,7 +2141,352 @@ function EntryCanopy({
         position={[canopyW / 2 - 0.07, -postH / 2, canopyProtrude - 0.05]}
       >
         <boxGeometry args={[0.09, postH, 0.09]} />
-        <meshStandardMaterial color="#2f2c25" roughness={0.85} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.85} />
+      </mesh>
+    </group>
+  );
+}
+
+function resolveBodyStyle(
+  model3D: Model3D,
+  sceneSeed: string,
+): "box" | "l-shape" | "split-level" {
+  if (model3D.bodyStyle) return model3D.bodyStyle;
+  const r = seededRandom(`${sceneSeed}:bodyStyle`);
+  const opts = ["box", "l-shape", "split-level"] as const;
+  return opts[Math.floor(r() * 3)] ?? "box";
+}
+
+function BodyStyleVolume({
+  floorPlan,
+  model3D,
+  profile,
+  sceneSeed,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+  profile: SceneStyleProfile;
+  sceneSeed: string;
+}) {
+  const style = resolveBodyStyle(model3D, sceneSeed);
+
+  const { wingW, wingD, wingH, wingX, wingZ, side } = useMemo(() => {
+    const r = seededRandom(`${sceneSeed}:bodyVol`);
+    const s = r() > 0.5 ? 1 : -1;
+    const wW = 2.4 + r() * 1.4;
+    const wD = floorPlan.height * (0.52 + r() * 0.2);
+    return {
+      wingW: wW,
+      wingD: wD,
+      wingH: FLOOR_HEIGHT,
+      wingX: s * (floorPlan.width / 2 + wW / 2),
+      wingZ: -(floorPlan.height / 2 - wD / 2),
+      side: s,
+    };
+  }, [sceneSeed, floorPlan.width, floorPlan.height]);
+
+  const { accentW, accentD, accentH, accentX } = useMemo(() => {
+    const r = seededRandom(`${sceneSeed}:bodyVol`);
+    const s = r() > 0.5 ? 1 : -1;
+    const aW = floorPlan.width * (0.28 + r() * 0.16);
+    const aD = 1.1 + r() * 0.85;
+    return {
+      accentW: aW,
+      accentD: aD,
+      accentH: model3D.floors * FLOOR_HEIGHT,
+      accentX: s * (floorPlan.width / 2 - aW / 2),
+    };
+  }, [sceneSeed, floorPlan.width, model3D.floors]);
+
+  const roofCfg = resolveRoofMaterialConfig(model3D.roofMaterial, profile.roofColor);
+
+  if (style === "box") return null;
+
+  if (style === "l-shape") {
+    const parWThick = 0.1;
+    return (
+      <group>
+        {/* Wing volume */}
+        <mesh position={[wingX, wingH / 2, wingZ]} castShadow receiveShadow>
+          <boxGeometry args={[wingW, wingH, wingD]} />
+          <meshStandardMaterial color={profile.wallColor} roughness={profile.wallRoughness} metalness={profile.wallMetalness} />
+        </mesh>
+        {/* Flat roof slab */}
+        <mesh position={[wingX, wingH + 0.1, wingZ]} castShadow>
+          <boxGeometry args={[wingW + ROOF_OVERHANG * 2, 0.2, wingD + ROOF_OVERHANG * 2]} />
+          <meshStandardMaterial color={roofCfg.color} roughness={roofCfg.roughness} metalness={roofCfg.metalness} />
+        </mesh>
+        {/* South parapet */}
+        <mesh position={[wingX, wingH + 0.3, wingZ + wingD / 2 - 0.05]} castShadow>
+          <boxGeometry args={[wingW + ROOF_OVERHANG * 2, 0.4, parWThick]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
+        </mesh>
+        {/* Outer (east/west) parapet */}
+        <mesh position={[wingX + side * (wingW / 2 + ROOF_OVERHANG - 0.05), wingH + 0.3, wingZ]} castShadow>
+          <boxGeometry args={[parWThick, 0.4, wingD + ROOF_OVERHANG * 2]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
+        </mesh>
+        {/* South-outer corner board */}
+        <mesh position={[wingX + side * (wingW / 2 - 0.06), wingH / 2, wingZ + wingD / 2]}>
+          <boxGeometry args={[0.1, wingH, 0.1]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.82} />
+        </mesh>
+        {/* North-outer corner board */}
+        <mesh position={[wingX + side * (wingW / 2 - 0.06), wingH / 2, wingZ - wingD / 2]}>
+          <boxGeometry args={[0.1, wingH, 0.1]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.82} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // split-level
+  const southFace = floorPlan.height / 2;
+  return (
+    <group>
+      {/* Accent volume */}
+      <mesh position={[accentX, accentH / 2, southFace + accentD / 2]} castShadow receiveShadow>
+        <boxGeometry args={[accentW, accentH, accentD]} />
+        <meshStandardMaterial color={profile.wallColor} roughness={profile.wallRoughness} metalness={profile.wallMetalness} />
+      </mesh>
+      {/* Flat cap */}
+      <mesh position={[accentX, accentH + 0.1, southFace + accentD / 2]} castShadow>
+        <boxGeometry args={[accentW + 0.12, 0.2, accentD + ROOF_OVERHANG]} />
+        <meshStandardMaterial color={roofCfg.color} roughness={roofCfg.roughness} metalness={roofCfg.metalness} />
+      </mesh>
+      {/* Front face trim header */}
+      <mesh position={[accentX, accentH + 0.03, southFace + accentD - 0.05]} castShadow>
+        <boxGeometry args={[accentW + 0.12, 0.06, 0.1]} />
+        <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
+      </mesh>
+      {/* Left corner board */}
+      <mesh position={[accentX - accentW / 2 + 0.05, accentH / 2, southFace + accentD / 2]}>
+        <boxGeometry args={[0.1, accentH, 0.1]} />
+        <meshStandardMaterial color={profile.trimColor} roughness={0.82} />
+      </mesh>
+      {/* Right corner board */}
+      <mesh position={[accentX + accentW / 2 - 0.05, accentH / 2, southFace + accentD / 2]}>
+        <boxGeometry args={[0.1, accentH, 0.1]} />
+        <meshStandardMaterial color={profile.trimColor} roughness={0.82} />
+      </mesh>
+    </group>
+  );
+}
+
+function Dormers({
+  floorPlan,
+  model3D,
+  profile,
+  sceneSeed,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+  profile: SceneStyleProfile;
+  sceneSeed: string;
+}) {
+  if (model3D.roofType !== "gable") return null;
+  if (model3D.sustainabilityFeatures.solarPanels) return null;
+
+  const rawCount = model3D.dormerCount ?? Math.floor(seededRandom(`${sceneSeed}:dormers`)() * 3);
+  const count = rawCount as 0 | 1 | 2 | 3;
+  if (count === 0) return null;
+
+  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
+  const d = floorPlan.height + ROOF_OVERHANG * 2;
+  const w = floorPlan.width + ROOF_OVERHANG * 2;
+  const peak = d * 0.38;
+
+  const T = 0.36;
+  const dormerBaseY = top + T * peak;
+  const dormerBaseZ = (d / 2) * (1 - T);
+
+  const DW = 1.55;
+  const DH = 1.15;
+  const DD = 0.62;
+  const SHED_SLOPE = 0.18;
+  const SHED_ANGLE = Math.atan2(SHED_SLOPE * DD, DD);
+  const OVH = 0.14;
+  const ROOF_THICK = 0.11;
+
+  const usableHalfW = w / 2 - DW / 2 - 0.1;
+  const xPositions =
+    count === 1
+      ? [0]
+      : count === 2
+        ? [-usableHalfW * 0.55, usableHalfW * 0.55]
+        : [-usableHalfW * 0.8, 0, usableHalfW * 0.8];
+
+  const roofCfg = resolveRoofMaterialConfig(model3D.roofMaterial, profile.roofColor);
+
+  return (
+    <>
+      {xPositions.map((x, i) => (
+        <group key={`dormer-${i}`} position={[x, 0, 0]}>
+          {/* Dormer body */}
+          <mesh position={[0, dormerBaseY + DH / 2, dormerBaseZ + DD / 2]} castShadow receiveShadow>
+            <boxGeometry args={[DW, DH, DD]} />
+            <meshStandardMaterial color={profile.wallColor} roughness={profile.wallRoughness} metalness={profile.wallMetalness} />
+          </mesh>
+          {/* Left side cheek */}
+          <mesh position={[-(DW / 2 + 0.05), dormerBaseY + DH / 2, dormerBaseZ + DD / 2]} castShadow receiveShadow>
+            <boxGeometry args={[0.1, DH, DD]} />
+            <meshStandardMaterial color={profile.wallColor} roughness={profile.wallRoughness} metalness={profile.wallMetalness} />
+          </mesh>
+          {/* Right side cheek */}
+          <mesh position={[DW / 2 + 0.05, dormerBaseY + DH / 2, dormerBaseZ + DD / 2]} castShadow receiveShadow>
+            <boxGeometry args={[0.1, DH, DD]} />
+            <meshStandardMaterial color={profile.wallColor} roughness={profile.wallRoughness} metalness={profile.wallMetalness} />
+          </mesh>
+          {/* Mini shed roof */}
+          <mesh
+            position={[0, dormerBaseY + DH + 0.04, dormerBaseZ + DD / 2]}
+            rotation={[-SHED_ANGLE, 0, 0]}
+            castShadow
+          >
+            <boxGeometry args={[DW + OVH * 2, ROOF_THICK, DD + OVH * 2]} />
+            <meshStandardMaterial color={roofCfg.color} roughness={roofCfg.roughness} metalness={roofCfg.metalness} />
+          </mesh>
+          {/* Window frame (behind glass) */}
+          <mesh position={[0, dormerBaseY + DH / 2, dormerBaseZ + DD + 0.01]}>
+            <boxGeometry args={[DW * 0.58 + 0.14, DH * 0.62 + 0.14, 0.06]} />
+            <meshStandardMaterial color={profile.frameColor} roughness={0.72} />
+          </mesh>
+          {/* Window glass */}
+          <mesh position={[0, dormerBaseY + DH / 2, dormerBaseZ + DD + 0.015]}>
+            <boxGeometry args={[DW * 0.58, DH * 0.62, 0.03]} />
+            <meshPhysicalMaterial transmission={0.9} roughness={0.08} thickness={0.08} color="#b8d8f0" />
+          </mesh>
+          {/* Eave fascia */}
+          <mesh position={[0, dormerBaseY + DH, dormerBaseZ + DD + OVH]} castShadow>
+            <boxGeometry args={[DW + OVH * 2, 0.1, 0.09]} />
+            <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
+          </mesh>
+        </group>
+      ))}
+    </>
+  );
+}
+
+function Chimney({
+  floorPlan,
+  model3D,
+  sceneSeed,
+  index,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+  sceneSeed: string;
+  index: number;
+  profile: SceneStyleProfile;
+}) {
+  const top = FOUNDATION_HEIGHT + model3D.floors * FLOOR_HEIGHT;
+  const peakH = getRoofPeakHeight(floorPlan, model3D);
+
+  const { chimneyH, offsetX } = useMemo(() => {
+    const r = seededRandom(`${sceneSeed}:chimney${index}`);
+    return {
+      chimneyH: 0.9 + r() * 0.5,
+      offsetX: (r() * 0.5 - 0.25) * floorPlan.width,
+    };
+  }, [sceneSeed, index, floorPlan.width]);
+  const embedDepth = peakH - top + 0.1;
+  const shaftH = chimneyH + embedDepth;
+  const shaftCentreY = peakH - embedDepth / 2 + chimneyH / 2;
+  const mirror = index === 1 ? -1 : 1;
+  const chimneyColor = mixColor(profile.hardscapeColor, "#5c4a3a", 0.4);
+
+  return (
+    <group position={[offsetX * mirror, 0, 0]}>
+      {/* Main shaft */}
+      <mesh position={[0, shaftCentreY, 0]} castShadow>
+        <boxGeometry args={[0.55, shaftH, 0.55]} />
+        <meshStandardMaterial color={chimneyColor} roughness={0.95} />
+      </mesh>
+      {/* Cap crown – slightly wider overhang */}
+      <mesh position={[0, peakH + chimneyH - 0.07, 0]} castShadow>
+        <boxGeometry args={[0.72, 0.14, 0.72]} />
+        <meshStandardMaterial color={mixColor(chimneyColor, "#2a1e14", 0.25)} roughness={0.94} />
+      </mesh>
+      {/* Flue pots */}
+      <mesh position={[-0.14, peakH + chimneyH + 0.14, 0]} castShadow>
+        <cylinderGeometry args={[0.075, 0.075, 0.28, 10]} />
+        <meshStandardMaterial color="#3a322a" roughness={0.9} />
+      </mesh>
+      <mesh position={[0.14, peakH + chimneyH + 0.14, 0]} castShadow>
+        <cylinderGeometry args={[0.075, 0.075, 0.28, 10]} />
+        <meshStandardMaterial color="#3a322a" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+function Deck({
+  floorPlan,
+  model3D,
+  profile,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+  profile: SceneStyleProfile;
+}) {
+  if (!model3D.hasDeck || model3D.floors < 2) return null;
+
+  const deckW = Math.min(floorPlan.width * 0.55, 4.5);
+  const deckD = 1.65;
+  const deckY = FOUNDATION_HEIGHT + FLOOR_HEIGHT;
+  const slabT = 0.14;
+  const postH = FLOOR_HEIGHT;
+  const railH = 0.95;
+  const railT = 0.06;
+  const postSpacing = 0.85;
+  const postCount = Math.max(2, Math.floor(deckW / postSpacing));
+
+  return (
+    <group position={[0, deckY, floorPlan.height / 2]}>
+      {/* Floor slab */}
+      <mesh position={[0, 0, deckD / 2]} castShadow receiveShadow>
+        <boxGeometry args={[deckW, slabT, deckD]} />
+        <meshStandardMaterial color={profile.trimColor} roughness={0.82} />
+      </mesh>
+      {/* Corner support posts */}
+      {[
+        [-deckW / 2 + 0.06, -postH / 2, deckD - 0.06],
+        [deckW / 2 - 0.06, -postH / 2, deckD - 0.06],
+        [-deckW / 2 + 0.06, -postH / 2, 0.06],
+        [deckW / 2 - 0.06, -postH / 2, 0.06],
+      ].map(([x, y, z], i) => (
+        <mesh key={`post-${i}`} position={[x, y, z]} castShadow>
+          <boxGeometry args={[0.1, postH, 0.1]} />
+          <meshStandardMaterial color={profile.frameColor} roughness={0.85} />
+        </mesh>
+      ))}
+      {/* Railing posts along front edge */}
+      {Array.from({ length: postCount }).map((_, i) => {
+        const x = -deckW / 2 + (i + 0.5) * (deckW / postCount);
+        return (
+          <mesh key={`rp-${i}`} position={[x, slabT / 2 + railH / 2, deckD - 0.04]} castShadow>
+            <boxGeometry args={[0.07, railH, 0.07]} />
+            <meshStandardMaterial color={profile.frameColor} roughness={0.85} />
+          </mesh>
+        );
+      })}
+      {/* Top rail – front */}
+      <mesh position={[0, slabT / 2 + railH + railT / 2, deckD - 0.04]} castShadow>
+        <boxGeometry args={[deckW, railT, railT]} />
+        <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
+      </mesh>
+      {/* Side rails */}
+      {[-deckW / 2 + 0.04, deckW / 2 - 0.04].map((x, i) => (
+        <mesh key={`sr-${i}`} position={[x, slabT / 2 + railH + railT / 2, deckD / 2]} castShadow>
+          <boxGeometry args={[railT, railT, deckD]} />
+          <meshStandardMaterial color={profile.trimColor} roughness={0.78} />
+        </mesh>
+      ))}
+      {/* Bottom rail – front */}
+      <mesh position={[0, slabT / 2 + 0.16, deckD - 0.04]}>
+        <boxGeometry args={[deckW, railT, railT]} />
+        <meshStandardMaterial color={profile.frameColor} roughness={0.85} />
       </mesh>
     </group>
   );
@@ -957,11 +2495,19 @@ function EntryCanopy({
 function HomeScene({
   floorPlan,
   model3D,
+  sceneSeed,
+  promptContext,
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
+  sceneSeed: string;
+  promptContext: ScenePromptContext;
 }) {
   const features = model3D.sustainabilityFeatures;
+  const profile = useMemo(
+    () => resolveSceneStyleProfile(model3D, promptContext),
+    [model3D, promptContext],
+  );
 
   return (
     <>
@@ -972,11 +2518,11 @@ function HomeScene({
         mieCoefficient={0.005}
         mieDirectionalG={0.8}
       />
-      <Environment preset="sunset" />
-      <ambientLight intensity={0.22} />
+      <Environment preset="city" />
+      <ambientLight intensity={0.34} />
       <directionalLight
         position={[12, 16, 9]}
-        intensity={1.2}
+        intensity={1.45}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -988,9 +2534,9 @@ function HomeScene({
         shadow-camera-top={30}
         shadow-camera-bottom={-30}
       />
-      <directionalLight position={[-10, 8, -6]} intensity={0.3} />
+      <directionalLight position={[-10, 8, -6]} intensity={0.22} />
 
-      <Ground floorPlan={floorPlan} />
+      <Ground floorPlan={floorPlan} profile={profile} />
       <ContactShadows
         position={[0, 0.02, 0]}
         opacity={0.32}
@@ -998,29 +2544,47 @@ function HomeScene({
         blur={2.8}
         far={12}
       />
-      <Foundation floorPlan={floorPlan} />
-      <WallsWithOpenings floorPlan={floorPlan} model3D={model3D} />
-      <Roof floorPlan={floorPlan} model3D={model3D} />
+      <WallsWithOpenings floorPlan={floorPlan} model3D={model3D} profile={profile} sceneSeed={sceneSeed} />
+      <Roof floorPlan={floorPlan} model3D={model3D} profile={profile} sceneSeed={sceneSeed} />
+      <Dormers floorPlan={floorPlan} model3D={model3D} profile={profile} sceneSeed={sceneSeed} />
 
       {model3D.windows.map((w, i) => (
-        <Window key={`win-${i}`} opening={w} floorPlan={floorPlan} />
+        <Window key={`win-${i}`} opening={w} floorPlan={floorPlan} profile={profile} />
       ))}
       {model3D.doors.map((d, i) => (
-        <Door key={`door-${i}`} opening={d} floorPlan={floorPlan} />
+        <Door key={`door-${i}`} opening={d} floorPlan={floorPlan} profile={profile} />
       ))}
-      <EntryCanopy floorPlan={floorPlan} model3D={model3D} />
+      <InteriorFurniture floorPlan={floorPlan} sceneSeed={sceneSeed} profile={profile} />
+      <BodyStyleVolume floorPlan={floorPlan} model3D={model3D} profile={profile} sceneSeed={sceneSeed} />
+      <EntryCanopy floorPlan={floorPlan} model3D={model3D} profile={profile} />
+      <Deck floorPlan={floorPlan} model3D={model3D} profile={profile} />
+
+      {(model3D.chimneyCount ?? 0) >= 1 && (
+        <Chimney floorPlan={floorPlan} model3D={model3D} sceneSeed={sceneSeed} index={0} profile={profile} />
+      )}
+      {(model3D.chimneyCount ?? 0) >= 2 && (
+        <Chimney floorPlan={floorPlan} model3D={model3D} sceneSeed={sceneSeed} index={1} profile={profile} />
+      )}
 
       {features.solarPanels ? (
-        <SolarArray floorPlan={floorPlan} model3D={model3D} />
+        <SolarArray floorPlan={floorPlan} model3D={model3D} profile={profile} />
       ) : null}
-      {features.rainwaterTank ? <RainwaterTank floorPlan={floorPlan} /> : null}
+      {features.rainwaterTank ? (
+        <RainwaterTank floorPlan={floorPlan} sceneSeed={sceneSeed} profile={profile} />
+      ) : null}
       {features.permeableDriveway ? (
-        <PermeableDriveway floorPlan={floorPlan} />
+        <PermeableDriveway floorPlan={floorPlan} profile={profile} />
       ) : null}
       {features.crossVentilation ? (
-        <CrossVentilationArrows floorPlan={floorPlan} model3D={model3D} />
+        <CrossVentilationArrows
+          floorPlan={floorPlan}
+          model3D={model3D}
+          profile={profile}
+        />
       ) : null}
-      {features.trees ? <Trees floorPlan={floorPlan} /> : null}
+      {features.trees ? (
+        <Trees floorPlan={floorPlan} sceneSeed={sceneSeed} profile={profile} model3D={model3D} />
+      ) : null}
 
       <OrbitControls
         makeDefault
@@ -1106,6 +2670,14 @@ export function Home3DPreview({
   model3D,
   upgrades,
   materials,
+  architecturalStyle,
+  summary,
+  location,
+  climateRegion,
+  budgetLevel,
+  visualPrompts,
+  styleAnalysis,
+  sceneSeed,
   className,
   variant = "card",
 }: {
@@ -1113,6 +2685,14 @@ export function Home3DPreview({
   model3D: Model3D;
   upgrades?: GeneratedHomeConcept["upgrades"];
   materials?: GeneratedHomeConcept["materials"];
+  architecturalStyle?: GeneratedHomeConcept["architecturalStyle"];
+  summary?: GeneratedHomeConcept["summary"];
+  location?: GeneratedHomeConcept["location"];
+  climateRegion?: GeneratedHomeConcept["climateRegion"];
+  budgetLevel?: GeneratedHomeConcept["budgetLevel"];
+  visualPrompts?: GeneratedHomeConcept["visualPrompts"];
+  styleAnalysis?: GeneratedHomeConcept["styleAnalysis"];
+  sceneSeed?: string;
   className?: string;
   variant?: "card" | "workspace";
 }) {
@@ -1141,6 +2721,30 @@ export function Home3DPreview({
   );
 
   const cameraDistance = Math.max(floorPlan.width, floorPlan.height) * 1.65;
+  const resolvedSceneSeed =
+    sceneSeed || createSceneSeed({ exteriorColor: model3D.exteriorColor });
+  const promptContext = useMemo<ScenePromptContext>(
+    () => ({
+      architecturalStyle,
+      summary,
+      location,
+      climateRegion,
+      budgetLevel,
+      visualPrompts,
+      styleAnalysis,
+      materials,
+    }),
+    [
+      architecturalStyle,
+      summary,
+      location,
+      climateRegion,
+      budgetLevel,
+      visualPrompts,
+      styleAnalysis,
+      materials,
+    ],
+  );
 
   if (variant === "workspace") {
     return (
@@ -1158,7 +2762,12 @@ export function Home3DPreview({
               fov: 50,
             }}
           >
-            <HomeScene floorPlan={floorPlan} model3D={model3D} />
+            <HomeScene
+              floorPlan={floorPlan}
+              model3D={model3D}
+              sceneSeed={resolvedSceneSeed}
+              promptContext={promptContext}
+            />
           </Canvas>
         </div>
 
@@ -1325,7 +2934,12 @@ export function Home3DPreview({
               fov: 32,
             }}
           >
-            <HomeScene floorPlan={floorPlan} model3D={model3D} />
+            <HomeScene
+              floorPlan={floorPlan}
+              model3D={model3D}
+              sceneSeed={resolvedSceneSeed}
+              promptContext={promptContext}
+            />
           </Canvas>
 
           {showFloorPlan ? (

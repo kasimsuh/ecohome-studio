@@ -118,7 +118,14 @@ export const model3DSchema = z.object({
   exteriorColor: z.string().min(1).max(80),
   windows: z.array(modelOpeningSchema).max(40),
   doors: z.array(modelOpeningSchema).max(20),
-  sustainabilityFeatures: sustainabilityFeaturesSchema
+  sustainabilityFeatures: sustainabilityFeaturesSchema,
+  facadeMaterial: z.enum(["timber-board","brick","rendered-plaster","stone-veneer","metal-panel","fiber-cement"]).optional(),
+  roofMaterial: z.enum(["metal-standing-seam","clay-tile","asphalt-shingle","rubber-membrane"]).optional(),
+  chimneyCount: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
+  hasDeck: z.boolean().optional(),
+  bodyStyle: z.enum(["box", "l-shape", "split-level"]).optional(),
+  dormerCount: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  roofDesign: z.enum(["craftsman", "contemporary", "traditional"]).optional(),
 });
 
 export const upgradeSchema = z.object({
