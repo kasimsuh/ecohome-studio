@@ -20,6 +20,7 @@ import {
   getTreePlacements,
   resolveExteriorColor,
   resolveRoofColor,
+  resolveSceneStyleProfile,
 } from "@/components/results/home-3d-preview";
 import { sampleStructuredHomeConcept } from "@/lib/domain/sample-structured-home";
 import type { ModelOpening } from "@/lib/domain/types";
@@ -82,6 +83,49 @@ describe("3D scene deterministic helpers", () => {
         exteriorColor: "charcoal cedar",
       }),
     ).toBe("#34312c");
+  });
+
+  it("derives realistic scene styling from prompt and material cues", () => {
+    const baseModel = sampleStructuredHomeConcept.model3D;
+
+    expect(
+      resolveSceneStyleProfile(
+        { ...baseModel, wallMaterial: "cedar cladding", exteriorColor: "warm cedar" },
+        { architecturalStyle: "Modern mass timber cabin" },
+      ),
+    ).toMatchObject({
+      materialFamily: "wood",
+      mood: "cabin",
+      facadeDetail: "wood-slat",
+    });
+
+    expect(
+      resolveSceneStyleProfile(
+        { ...baseModel, wallMaterial: "white lime plaster", exteriorColor: "soft white" },
+        { architecturalStyle: "minimal coastal light-filled home" },
+      ),
+    ).toMatchObject({
+      materialFamily: "plaster",
+      mood: "coastal",
+      facadeDetail: "plaster",
+    });
+
+    expect(
+      resolveSceneStyleProfile(
+        { ...baseModel, wallMaterial: "local stone", exteriorColor: "stone cottage" },
+        { materials: [{ name: "limestone", reason: "durable", sustainabilityBenefit: "local" }] },
+      ),
+    ).toMatchObject({
+      materialFamily: "stone",
+      facadeDetail: "stone-base",
+    });
+
+    expect(
+      resolveSceneStyleProfile(
+        { ...baseModel, wallMaterial: "unknown finish", exteriorColor: "generated color name" },
+        { summary: "A personal dream home with a calm natural palette" },
+      ).wallColor,
+    ).not.toBe("#dcc8a4");
   });
 
   it("places cross ventilation above the highest roof point for each roof type", () => {
