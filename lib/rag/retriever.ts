@@ -12,6 +12,16 @@ export interface RetrievedSustainabilityContext {
   snippets: GuidanceSnippet[];
   contextText: string;
   source: "supabase-pgvector" | "local-seed-docs" | "none";
+  diagnostics: {
+    query: string;
+    requestedLimit: number;
+    supabaseAttempted: boolean;
+    supabaseMatchCount: number;
+    localFallbackUsed: boolean;
+    localFallbackReason?: string;
+    supabaseError?: string;
+    localFallbackError?: string;
+  };
 }
 
 interface RetrievedDocumentLike {
@@ -30,6 +40,14 @@ const defaultRetrievedSnippetCount = 4;
 const maxSnippetTitleLength = 120;
 const maxSnippetSourceLength = 120;
 const maxSnippetContentLength = 320;
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message.replace(/\s+/g, " ").trim();
+  }
+
+  return String(error).replace(/\s+/g, " ").trim();
+}
 
 function normalizeRetrievedSnippetLimit(limit = defaultRetrievedSnippetCount) {
   if (!Number.isFinite(limit)) {
@@ -173,23 +191,31 @@ async function retrieveSupabaseGuidance(
   input: GenerateHomeRequest,
   limit: number,
 ) {
+  const query = buildSustainabilityRetrievalQuery(input);
   const vectorStore = await SupabaseVectorStore.fromExistingIndex(
     createEmbeddingModel(),
     getSupabaseVectorStoreConfig(),
   );
   const matches = await vectorStore.similaritySearchWithScore(
-    buildSustainabilityRetrievalQuery(input),
+    query,
     limit,
   );
 
-  return mapRetrievedDocumentsToSnippets(
+  const snippets = mapRetrievedDocumentsToSnippets(
     matches as Array<[RetrievedDocumentLike, number]>,
   );
+
+  return {
+    query,
+    snippets,
+    matchCount: matches.length,
+  };
 }
 
 async function retrieveLocalFallback(
   input: GenerateHomeRequest,
   limit: number,
+  diagnostics: RetrievedSustainabilityContext["diagnostics"],
 ): Promise<RetrievedSustainabilityContext> {
   try {
     const snippets = await retrieveLocalGuidance(input, limit);
@@ -198,12 +224,21 @@ async function retrieveLocalFallback(
       snippets,
       contextText: formatRetrievedContext(snippets),
       source: snippets.length ? "local-seed-docs" : "none",
+      diagnostics: {
+        ...diagnostics,
+        localFallbackUsed: true,
+      },
     };
-  } catch {
+  } catch (error) {
     return {
       snippets: [],
       contextText: "",
       source: "none",
+      diagnostics: {
+        ...diagnostics,
+        localFallbackUsed: true,
+        localFallbackError: getErrorMessage(error),
+      },
     };
   }
 }
@@ -212,15 +247,33 @@ export async function retrieveSustainabilityContext(
   input: GenerateHomeRequest,
   limit = 4,
 ): Promise<RetrievedSustainabilityContext> {
+  const normalizedLimit = normalizeRetrievedSnippetLimit(limit);
+  const query = buildSustainabilityRetrievalQuery(input);
+  const baseDiagnostics: RetrievedSustainabilityContext["diagnostics"] = {
+    query,
+    requestedLimit: normalizedLimit,
+    supabaseAttempted: false,
+    supabaseMatchCount: 0,
+    localFallbackUsed: false,
+  };
+
   try {
-    const normalizedLimit = normalizeRetrievedSnippetLimit(limit);
-    const supabaseSnippets = await retrieveSupabaseGuidance(
+    const supabaseResult = await retrieveSupabaseGuidance(
       input,
       normalizedLimit,
     );
+    const supabaseSnippets = supabaseResult.snippets;
+    const supabaseDiagnostics = {
+      ...baseDiagnostics,
+      supabaseAttempted: true,
+      supabaseMatchCount: supabaseResult.matchCount,
+    };
 
     if (!supabaseSnippets.length) {
-      return retrieveLocalFallback(input, normalizedLimit);
+      return retrieveLocalFallback(input, normalizedLimit, {
+        ...supabaseDiagnostics,
+        localFallbackReason: "supabase-returned-no-matches",
+      });
     }
 
     const localSnippets =
@@ -236,8 +289,20 @@ export async function retrieveSustainabilityContext(
       snippets,
       contextText: formatRetrievedContext(snippets),
       source: snippets.length ? "supabase-pgvector" : "none",
+      diagnostics: {
+        ...supabaseDiagnostics,
+        localFallbackUsed: localSnippets.length > 0,
+        ...(localSnippets.length > 0
+          ? { localFallbackReason: "supabase-results-padded-with-local-seed-docs" }
+          : {}),
+      },
     };
-  } catch {
-    return retrieveLocalFallback(input, normalizeRetrievedSnippetLimit(limit));
+  } catch (error) {
+    return retrieveLocalFallback(input, normalizedLimit, {
+      ...baseDiagnostics,
+      supabaseAttempted: true,
+      supabaseError: getErrorMessage(error),
+      localFallbackReason: "supabase-query-failed",
+    });
   }
 }

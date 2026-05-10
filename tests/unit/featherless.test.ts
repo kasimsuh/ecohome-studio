@@ -156,4 +156,182 @@ describe("generateStructuredHomeConceptWithFeatherless", () => {
       },
     ]);
   });
+
+  it("normalizes DeepSeek-style freeform output into the strict home concept schema", async () => {
+    mockCreateCompletion.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              conceptSummary:
+                "A compact eco-modern farmhouse concept for Toronto that prioritizes durability, daylight, and efficient envelope performance.",
+              location: "Toronto, Canada",
+              climateType: "cold climate",
+              budgetLevel: "mid-range",
+              architecturalStyle: "Eco-modern farmhouse",
+              sustainabilityScore: {
+                energyEfficiency: "88",
+                waterEfficiency: 72,
+                climateResilience: "90",
+                materialSustainability: 81,
+                affordability: "78",
+                environmentalImpact: "85",
+              },
+              floorPlan: {
+                width: "18",
+                height: "12",
+                rooms: [
+                  {
+                    name: "Open Plan Living / Dining / Kitchen",
+                    x: 0,
+                    y: 0,
+                    width: 10,
+                    height: 5,
+                    floor: 0,
+                    type: "open-plan",
+                  },
+                  {
+                    name: "Office",
+                    x: 10,
+                    y: 0,
+                    width: 4,
+                    height: 5,
+                    floor: 0,
+                    type: "office",
+                  },
+                  {
+                    name: "Bathroom",
+                    x: 14,
+                    y: 0,
+                    width: 4,
+                    height: 3,
+                    floor: 0,
+                    type: "bathroom",
+                  },
+                  {
+                    name: "Primary Bedroom",
+                    x: 0,
+                    y: 5,
+                    width: 8,
+                    height: 4,
+                    floor: 1,
+                    type: "bedroom",
+                  },
+                ],
+              },
+              model3D: {
+                floors: "2",
+                roofType: "flat with parapet",
+                wallMaterial: "Cellulose-insulated timber frame",
+                exteriorColor: "soft beige-green",
+                windows: [
+                  {
+                    side: "south",
+                    position: 28,
+                    width: "1.8",
+                    height: "1.5",
+                    level: 0,
+                  },
+                  {
+                    wall: "north",
+                    offset: 1.4,
+                    width: 1.3,
+                    height: 1.2,
+                    floor: 1,
+                  },
+                ],
+                doors: [
+                  {
+                    orientation: "east",
+                    offset: 87,
+                    width: "1.1",
+                    height: "2.2",
+                    floor: 0,
+                  },
+                ],
+                sustainabilityFeatures: {
+                  solarPanels: "yes",
+                  greenRoof: "no",
+                  rainwaterTank: "true",
+                  trees: 1,
+                  permeableDriveway: "enabled",
+                  crossVentilation: "true",
+                },
+              },
+              upgrades: [
+                {
+                  recommendation: "Cross-ventilation layout",
+                  impact: "high",
+                  description:
+                    "Align openings to support passive cooling and better indoor air quality.",
+                  benefit: "Improve summer comfort with less mechanical cooling.",
+                },
+                "Add a rainwater harvesting tank for garden irrigation.",
+              ],
+              materials: "Mass timber, cellulose insulation, recycled brick",
+              visualPrompts: {
+                exteriorPrompt: "Exterior perspective of a compact eco-modern farmhouse.",
+                interiorPrompt: "Interior view with daylight, timber, and simple low-impact finishes.",
+              },
+            }),
+          },
+        },
+      ],
+    });
+
+    const concept = await generateStructuredHomeConceptWithFeatherless({
+      input,
+      guidanceSnippets,
+    });
+
+    expect(concept.climateType).toBe("cold");
+    expect(concept.budgetLevel).toBe("medium");
+    expect(concept.floorPlan.rooms.map((room) => room.type)).toEqual([
+      "social",
+      "work",
+      "service",
+      "private",
+    ]);
+    expect(concept.model3D.roofType).toBe("flat");
+    expect(concept.model3D.windows[0]?.offset).toBe(0.28);
+    expect(concept.model3D.windows[1]?.offset).toBe(1);
+    expect(concept.model3D.doors[0]?.offset).toBe(0.87);
+    expect(concept.model3D.sustainabilityFeatures).toEqual({
+      solarPanels: true,
+      greenRoof: false,
+      rainwaterTank: true,
+      trees: true,
+      permeableDriveway: true,
+      crossVentilation: true,
+    });
+    expect(concept.upgrades).toEqual([
+      expect.objectContaining({
+        title: "Cross-ventilation layout",
+        category: "Comfort",
+        impactLevel: "High",
+      }),
+      expect.objectContaining({
+        title: "Add a rainwater harvesting tank for garden irrigation.",
+        category: "Water",
+        impactLevel: "Medium",
+      }),
+    ]);
+    expect(concept.materials).toEqual([
+      expect.objectContaining({ name: "Mass Timber" }),
+      expect.objectContaining({ name: "Cellulose Insulation" }),
+      expect.objectContaining({ name: "Recycled Brick" }),
+    ]);
+    expect(concept.sources).toEqual([
+      {
+        title: "Cold-climate envelope first",
+        source: "climate-resilience.md",
+        filename: "climate-resilience.md",
+      },
+      {
+        title: "Water-smart site strategy",
+        source: "water-efficiency.md",
+        filename: "water-efficiency.md",
+      },
+    ]);
+  });
 });
