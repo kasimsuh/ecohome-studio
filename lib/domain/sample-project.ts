@@ -1,5 +1,6 @@
 import { createGeneratedHomeConcept } from "@/lib/domain/mock-data";
-import type { DreamHomeInput } from "@/lib/domain/types";
+import { sampleStructuredHomeConcept } from "@/lib/domain/sample-structured-home";
+import type { DreamHomeInput, GeneratedHomeConcept } from "@/lib/domain/types";
 
 export const sampleDreamHomeInput: DreamHomeInput = {
   description:
@@ -26,7 +27,10 @@ export const sampleDreamHomeInput: DreamHomeInput = {
   }
 };
 
-export const sampleGeneratedHomeConcept = createGeneratedHomeConcept(
-  sampleDreamHomeInput,
-  "demo"
-);
+export const sampleGeneratedHomeConcept: GeneratedHomeConcept = {
+  ...createGeneratedHomeConcept(sampleDreamHomeInput, "demo"),
+  floorPlan: sampleStructuredHomeConcept.floorPlan,
+  model3D: sampleStructuredHomeConcept.model3D,
+  materials: sampleStructuredHomeConcept.materials,
+  upgrades: sampleStructuredHomeConcept.upgrades
+};
