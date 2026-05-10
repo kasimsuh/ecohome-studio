@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { buttonStyles } from "@/components/ui/button";
+import { SiteBrand } from "@/components/site/site-brand";
 
 const quickStarts = [
   {
@@ -54,7 +55,11 @@ function BackgroundScene() {
       <circle cx="1090" cy="105" r="38" fill="rgba(196,155,104,0.12)" />
 
       {/* Sun rays */}
-      <g stroke="rgba(196,155,104,0.22)" strokeWidth="1.5" strokeLinecap="round">
+      <g
+        stroke="rgba(196,155,104,0.22)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      >
         <line x1="1090" y1="50" x2="1090" y2="16" />
         <line x1="1090" y1="160" x2="1090" y2="196" />
         <line x1="1035" y1="105" x2="1001" y2="105" />
@@ -156,7 +161,13 @@ function BackgroundScene() {
         strokeWidth="10"
         strokeLinecap="round"
       />
-      <ellipse cx="1308" cy="560" rx="96" ry="68" fill="rgba(61,117,88,0.085)" />
+      <ellipse
+        cx="1308"
+        cy="560"
+        rx="96"
+        ry="68"
+        fill="rgba(61,117,88,0.085)"
+      />
       <ellipse cx="1330" cy="488" rx="82" ry="60" fill="rgba(61,117,88,0.10)" />
       <ellipse cx="1302" cy="416" rx="70" ry="54" fill="rgba(61,117,88,0.11)" />
       <ellipse cx="1322" cy="352" rx="58" ry="46" fill="rgba(61,117,88,0.10)" />
@@ -182,10 +193,28 @@ function BackgroundScene() {
         strokeWidth="6"
         strokeLinecap="round"
       />
-      <ellipse cx="1402" cy="644" rx="46" ry="34" fill="rgba(61,117,88,0.068)" />
-      <ellipse cx="1414" cy="596" rx="38" ry="30" fill="rgba(61,117,88,0.076)" />
+      <ellipse
+        cx="1402"
+        cy="644"
+        rx="46"
+        ry="34"
+        fill="rgba(61,117,88,0.068)"
+      />
+      <ellipse
+        cx="1414"
+        cy="596"
+        rx="38"
+        ry="30"
+        fill="rgba(61,117,88,0.076)"
+      />
       <ellipse cx="1406" cy="552" rx="30" ry="24" fill="rgba(61,117,88,0.07)" />
-      <ellipse cx="1412" cy="514" rx="20" ry="17" fill="rgba(61,117,88,0.062)" />
+      <ellipse
+        cx="1412"
+        cy="514"
+        rx="20"
+        ry="17"
+        fill="rgba(61,117,88,0.062)"
+      />
 
       {/* ── Ground grass line ── */}
       <path
@@ -216,47 +245,133 @@ function BackgroundScene() {
       {/* ── Floating leaves ── */}
       {/* Each leaf: filled teardrop + midrib stroke */}
       <g transform="translate(290,310) rotate(-28)">
-        <path d="M 0 0 Q -9 -15 0 -28 Q 9 -15 0 0 Z" fill="rgba(61,117,88,0.15)" />
-        <line x1="0" y1="0" x2="0" y2="-28" stroke="rgba(61,93,72,0.12)" strokeWidth="0.8" />
+        <path
+          d="M 0 0 Q -9 -15 0 -28 Q 9 -15 0 0 Z"
+          fill="rgba(61,117,88,0.15)"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="-28"
+          stroke="rgba(61,93,72,0.12)"
+          strokeWidth="0.8"
+        />
       </g>
       <g transform="translate(460,175) rotate(22)">
-        <path d="M 0 0 Q -11 -18 0 -34 Q 11 -18 0 0 Z" fill="rgba(61,117,88,0.11)" />
-        <line x1="0" y1="0" x2="0" y2="-34" stroke="rgba(61,93,72,0.10)" strokeWidth="0.8" />
+        <path
+          d="M 0 0 Q -11 -18 0 -34 Q 11 -18 0 0 Z"
+          fill="rgba(61,117,88,0.11)"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="-34"
+          stroke="rgba(61,93,72,0.10)"
+          strokeWidth="0.8"
+        />
       </g>
       <g transform="translate(660,148) rotate(-18)">
-        <path d="M 0 0 Q -7 -12 0 -22 Q 7 -12 0 0 Z" fill="rgba(61,117,88,0.13)" />
-        <line x1="0" y1="0" x2="0" y2="-22" stroke="rgba(61,93,72,0.10)" strokeWidth="0.7" />
+        <path
+          d="M 0 0 Q -7 -12 0 -22 Q 7 -12 0 0 Z"
+          fill="rgba(61,117,88,0.13)"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="-22"
+          stroke="rgba(61,93,72,0.10)"
+          strokeWidth="0.7"
+        />
       </g>
       <g transform="translate(820,192) rotate(38)">
-        <path d="M 0 0 Q -10 -17 0 -30 Q 10 -17 0 0 Z" fill="rgba(61,117,88,0.10)" />
-        <line x1="0" y1="0" x2="0" y2="-30" stroke="rgba(61,93,72,0.09)" strokeWidth="0.8" />
+        <path
+          d="M 0 0 Q -10 -17 0 -30 Q 10 -17 0 0 Z"
+          fill="rgba(61,117,88,0.10)"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="-30"
+          stroke="rgba(61,93,72,0.09)"
+          strokeWidth="0.8"
+        />
       </g>
       <g transform="translate(980,268) rotate(-42)">
-        <path d="M 0 0 Q -8 -14 0 -25 Q 8 -14 0 0 Z" fill="rgba(61,117,88,0.12)" />
-        <line x1="0" y1="0" x2="0" y2="-25" stroke="rgba(61,93,72,0.10)" strokeWidth="0.7" />
+        <path
+          d="M 0 0 Q -8 -14 0 -25 Q 8 -14 0 0 Z"
+          fill="rgba(61,117,88,0.12)"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="-25"
+          stroke="rgba(61,93,72,0.10)"
+          strokeWidth="0.7"
+        />
       </g>
       <g transform="translate(1170,315) rotate(-22)">
-        <path d="M 0 0 Q -9 -15 0 -27 Q 9 -15 0 0 Z" fill="rgba(61,117,88,0.13)" />
-        <line x1="0" y1="0" x2="0" y2="-27" stroke="rgba(61,93,72,0.10)" strokeWidth="0.8" />
+        <path
+          d="M 0 0 Q -9 -15 0 -27 Q 9 -15 0 0 Z"
+          fill="rgba(61,117,88,0.13)"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="-27"
+          stroke="rgba(61,93,72,0.10)"
+          strokeWidth="0.8"
+        />
       </g>
       {/* Warm-toned leaf */}
       <g transform="translate(360,490) rotate(14)">
-        <path d="M 0 0 Q -7 -11 0 -20 Q 7 -11 0 0 Z" fill="rgba(196,155,104,0.18)" />
-        <line x1="0" y1="0" x2="0" y2="-20" stroke="rgba(196,155,104,0.14)" strokeWidth="0.7" />
+        <path
+          d="M 0 0 Q -7 -11 0 -20 Q 7 -11 0 0 Z"
+          fill="rgba(196,155,104,0.18)"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="-20"
+          stroke="rgba(196,155,104,0.14)"
+          strokeWidth="0.7"
+        />
       </g>
       <g transform="translate(1060,440) rotate(-10)">
-        <path d="M 0 0 Q -6 -10 0 -18 Q 6 -10 0 0 Z" fill="rgba(196,155,104,0.14)" />
-        <line x1="0" y1="0" x2="0" y2="-18" stroke="rgba(196,155,104,0.11)" strokeWidth="0.7" />
+        <path
+          d="M 0 0 Q -6 -10 0 -18 Q 6 -10 0 0 Z"
+          fill="rgba(196,155,104,0.14)"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="-18"
+          stroke="rgba(196,155,104,0.11)"
+          strokeWidth="0.7"
+        />
       </g>
 
       {/* ── Energy lightning bolts ── */}
       <g fill="rgba(196,155,104,0.22)" transform="translate(572,158)">
         <path d="M 7 0 L 1 11 L 5 11 L -1 22 L 9 9 L 5 9 L 11 0 Z" />
       </g>
-      <g fill="rgba(196,155,104,0.16)" transform="translate(870,128) scale(0.75)">
+      <g
+        fill="rgba(196,155,104,0.16)"
+        transform="translate(870,128) scale(0.75)"
+      >
         <path d="M 7 0 L 1 11 L 5 11 L -1 22 L 9 9 L 5 9 L 11 0 Z" />
       </g>
-      <g fill="rgba(61,117,88,0.18)" transform="translate(1240,310) scale(0.65)">
+      <g
+        fill="rgba(61,117,88,0.18)"
+        transform="translate(1240,310) scale(0.65)"
+      >
         <path d="M 7 0 L 1 11 L 5 11 L -1 22 L 9 9 L 5 9 L 11 0 Z" />
       </g>
 
@@ -287,7 +402,13 @@ function BackgroundScene() {
       >
         <line x1="0" y1="0" x2="0" y2="60" />
         <line x1="-3" y1="60" x2="3" y2="60" />
-        <circle cx="0" cy="0" r="2.5" fill="rgba(61,93,72,0.11)" stroke="none" />
+        <circle
+          cx="0"
+          cy="0"
+          r="2.5"
+          fill="rgba(61,93,72,0.11)"
+          stroke="none"
+        />
         <line x1="0" y1="0" x2="0" y2="-20" />
         <line x1="0" y1="0" x2="17" y2="10" />
         <line x1="0" y1="0" x2="-17" y2="10" />
@@ -323,24 +444,15 @@ export default function HomePage() {
 
       <div className="shell relative flex h-screen flex-col py-4 md:py-6">
         <header className="fade-up flex items-center justify-between gap-4">
-          <Link href="/" className="block">
-            <div>
-              <p className="font-tech text-sm font-semibold uppercase tracking-[0.22em] text-[color:var(--accent)]">
-                EcoHome Studio
-              </p>
-              <p className="text-sm text-[color:var(--muted)]">
-                Sustainable concept assistant
-              </p>
-            </div>
-          </Link>
+          <SiteBrand
+            href="/"
+            subtitle="Sustainable concept assistant"
+            subtitleClassName="text-sm"
+            className="max-w-fit text-sm"
+            showSubtitle
+          />
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/results/demo"
-              className="hidden rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2 text-sm text-[color:var(--muted)] transition hover:text-[color:var(--foreground)] md:inline-flex"
-            >
-              Sample result
-            </Link>
             <Link href="/studio" className={buttonStyles({ size: "sm" })}>
               Open studio
             </Link>

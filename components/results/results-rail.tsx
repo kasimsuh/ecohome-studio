@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import Link from "next/link";
 
+import { SiteBrand } from "@/components/site/site-brand";
 import { budgetLabels, climateLabels } from "@/lib/domain/constants";
 import type { GeneratedHomeConcept } from "@/lib/domain/types";
 import { formatDate } from "@/lib/utils";
@@ -172,14 +173,12 @@ function ReportRail({ project }: { project: GeneratedHomeConcept }) {
     <aside className="bg-[linear-gradient(180deg,rgba(255,250,242,0.78),rgba(232,221,202,0.66))] backdrop-blur-2xl lg:h-screen lg:overflow-y-auto lg:border-r lg:border-[rgba(61,93,72,0.16)]">
       <div className="mx-auto w-full max-w-[46rem] px-5 py-6 lg:max-w-none lg:px-6 lg:py-7">
         <div className="mb-7">
-          <Link href="/" className="block">
-            <p className="font-tech text-lg font-semibold uppercase tracking-[0.2em] text-[color:var(--accent)]">
-              EcoHome Studio
-            </p>
-            <p className="mt-1 text-sm text-[color:var(--muted)]">
-              Sustainable home concept lab
-            </p>
-          </Link>
+          <SiteBrand
+            href="/"
+            titleClassName="text-lg tracking-[0.2em]"
+            subtitleClassName="mt-1 text-sm"
+            className="text-lg"
+          />
         </div>
 
         <div className="mb-6 flex flex-wrap gap-2 text-xs font-semibold text-[color:var(--muted)]">
