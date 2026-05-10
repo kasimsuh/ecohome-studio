@@ -6,7 +6,8 @@ import {
   type GenerateHomeRequest,
   type GeneratedHomeConceptPayload,
   type GuidanceSnippet,
-  type HomeConcept
+  type HomeConcept,
+  type SourceReference,
 } from "@/lib/domain/home-concept-schema";
 
 const FEATHERLESS_BASE_URL = "https://api.featherless.ai/v1";
@@ -70,7 +71,8 @@ function extractJsonObject(content: string) {
 
 function normalizeHomeConceptCandidate(
   candidate: unknown,
-  input: GenerateHomeRequest
+  input: GenerateHomeRequest,
+  guidanceSnippets: GuidanceSnippet[],
 ): HomeConcept {
   if (!candidate || typeof candidate !== "object") {
     throw new Error("Model output was not an object.");
@@ -104,6 +106,68 @@ function normalizeHomeConceptCandidate(
     raw.visualPrompts && typeof raw.visualPrompts === "object"
       ? (raw.visualPrompts as Record<string, unknown>)
       : {};
+  const rawSources = Array.isArray(raw.sources) ? raw.sources : [];
+
+  const normalizedSources = rawSources
+    .map((entry): SourceReference | null => {
+      const sourceEntry =
+        entry && typeof entry === "object"
+          ? (entry as Record<string, unknown>)
+          : {};
+      const source =
+        typeof sourceEntry.source === "string"
+          ? sourceEntry.source
+          : typeof sourceEntry.filename === "string"
+            ? sourceEntry.filename
+            : "";
+      const filename =
+        typeof sourceEntry.filename === "string"
+          ? sourceEntry.filename
+          : typeof sourceEntry.source === "string"
+            ? sourceEntry.source
+            : undefined;
+      const page =
+        typeof sourceEntry.page === "number" && Number.isInteger(sourceEntry.page)
+          ? sourceEntry.page
+          : undefined;
+      const title =
+        typeof sourceEntry.title === "string"
+          ? sourceEntry.title
+          : typeof sourceEntry.label === "string"
+            ? sourceEntry.label
+            : source
+              ? `${source} guidance`
+              : "";
+
+      if (!title.trim() || !source.trim()) {
+        return null;
+      }
+
+      return {
+        title,
+        source,
+        filename,
+        page,
+      };
+    })
+    .filter((source): source is SourceReference => source !== null);
+
+  const fallbackSources = guidanceSnippets
+    .map((snippet) => ({
+      title: snippet.title,
+      source: snippet.source,
+      filename: snippet.source,
+    }))
+    .filter(
+      (source, index, sources) =>
+        sources.findIndex(
+          (candidate) =>
+            candidate.title === source.title &&
+            candidate.source === source.source &&
+            candidate.filename === source.filename,
+        ) === index,
+    )
+    .slice(0, 8);
 
   const normalized = {
     ...raw,
@@ -166,6 +230,7 @@ function normalizeHomeConceptCandidate(
           ? visualPrompts.interiorPrompt
           : ""
     },
+    sources: normalizedSources.length ? normalizedSources.slice(0, 8) : fallbackSources,
     model3D: {
       ...(raw.model3D && typeof raw.model3D === "object" ? raw.model3D : {}),
       windows: Array.isArray((raw.model3D as Record<string, unknown> | undefined)?.windows)
@@ -250,6 +315,7 @@ Required top-level keys:
 - upgrades
 - materials
 - visualPrompts
+- sources
 
 Requirements:
 - Keep conceptSummary compact and under 120 words.
@@ -262,8 +328,18 @@ Requirements:
 - upgrades should be compact and actionable.
 - materials should be concise and sustainability-focused.
 - visualPrompts must include exteriorPrompt and interiorPrompt.
+- sources must be an array of the grounding references you actually used.
+- Each source should include title, source, and filename when available. Include page when available.
 - Use realistic dimensions and simple geometry-friendly layouts.
 `.trim();
+
+  const groundingContext = guidanceSnippets.map((snippet, index) => ({
+    id: index + 1,
+    title: snippet.title,
+    source: snippet.source,
+    filename: snippet.source,
+    content: snippet.content,
+  }));
 
   const userPrompt = JSON.stringify(
     {
@@ -275,7 +351,7 @@ Requirements:
         styleAnalysis: input.styleAnalysis ?? null,
         inspirationImages: input.inspirationImages
       },
-      groundingGuidance: guidanceSnippets
+      retrievedSustainabilityContext: groundingContext
     },
     null,
     2
@@ -317,7 +393,7 @@ export async function generateStructuredHomeConceptWithFeatherless({
   }
 
   const parsed = extractJsonObject(content);
-  const normalized = normalizeHomeConceptCandidate(parsed, input);
+  const normalized = normalizeHomeConceptCandidate(parsed, input, guidanceSnippets);
 
   return generatedHomeConceptSchema.parse({
     ...normalized,

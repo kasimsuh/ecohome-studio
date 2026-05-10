@@ -8,7 +8,7 @@ EcoHome Studio is a Next.js hackathon starter for an AI-powered sustainable home
 - Landing page, guided studio flow, and results dashboard shell
 - Typed domain model for dream home inputs, recommendations, scores, and outputs
 - Provider-ready mock AI layer for concept generation and inspiration analysis
-- API route handlers for `analyze-inspiration` and `generate-concept`
+- API route handlers for `analyze-inspiration`, legacy `generate-concept`, and structured `generate-home`
 - Vitest and Testing Library coverage for mock generation and core UI flow
 
 ## Getting started
@@ -33,15 +33,18 @@ npm run dev
 
 4. Open `http://localhost:3000`
 
-## Provider integration points
+## AI integration points
 
 - `lib/ai/index.ts` selects the active provider
 - `lib/ai/contracts.ts` defines the expected AI capabilities
 - `app/api/analyze-inspiration/route.ts` is where image analysis wiring lands
-- `app/api/generate-concept/route.ts` is where text generation and recommendation logic can be swapped from mock to real providers
+- `app/api/generate-concept/route.ts` is the legacy mock concept route currently used by the studio UI
+- `app/api/generate-home/route.ts` is the newer structured generation route used for the real Featherless + RAG migration
+- `lib/rag/retriever.ts` is the neutral retrieval layer that will be replaced with LangChain + Supabase pgvector
 
 ## Notes
 
 - Generated projects are stored in session storage by default. This keeps the starter lightweight and demo-friendly.
 - `/results/demo` always works as a sample output route even without generating a new concept.
 - The inspiration image analysis is mocked intentionally, so you can iterate on UX before handling real upload storage or model calls.
+- The repo has pivoted away from IBM watsonx.ai. Retrieval should be implemented with LangChain and Supabase pgvector instead.

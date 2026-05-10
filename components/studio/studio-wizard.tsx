@@ -14,6 +14,11 @@ import {
   climateOptions
 } from "@/lib/domain/constants";
 import { createInspirationImageRecord } from "@/lib/domain/mock-data";
+import {
+  adaptStructuredConceptToGeneratedHomeConcept,
+  isStructuredGeneratedHomeConceptPayload
+} from "@/lib/domain/structured-home-adapter";
+import type { GenerateHomeRequest } from "@/lib/domain/home-concept-schema";
 import type {
   BudgetLevel,
   ClimateRegion,
@@ -187,35 +192,69 @@ export function StudioWizard({
     setSubmitting(true);
     setFormError(null);
 
+    const requestBody: GenerateHomeRequest = {
+      ...formState,
+      inspirationImages,
+      styleAnalysis
+    };
+
     try {
-      const response = await fetch("/api/generate-concept", {
+      const response = await fetch("/api/generate-home", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          ...formState,
-          inspirationImages,
-          styleAnalysis
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
-        const payload = (await response.json()) as { error?: string };
-        throw new Error(payload.error || "Could not generate a home concept.");
+        throw new Error("Could not generate a structured home concept.");
       }
 
-      const concept = (await response.json()) as GeneratedHomeConcept;
+      const payload = (await response.json()) as unknown;
+
+      if (!isStructuredGeneratedHomeConceptPayload(payload)) {
+        throw new Error("Structured concept response was incomplete.");
+      }
+
+      const concept = adaptStructuredConceptToGeneratedHomeConcept(payload);
       window.sessionStorage.setItem(
         getProjectStorageKey(concept.projectId),
         JSON.stringify(concept)
       );
       router.push(`/results/${concept.projectId}`);
     } catch (error) {
-      setFormError(
-        error instanceof Error ? error.message : "Could not generate a home concept."
-      );
-      setSubmitting(false);
+      try {
+        const fallbackResponse = await fetch("/api/generate-concept", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!fallbackResponse.ok) {
+          const payload = (await fallbackResponse.json()) as { error?: string };
+          throw new Error(payload.error || "Could not generate a home concept.");
+        }
+
+        const concept = (await fallbackResponse.json()) as GeneratedHomeConcept;
+        window.sessionStorage.setItem(
+          getProjectStorageKey(concept.projectId),
+          JSON.stringify(concept)
+        );
+        router.push(`/results/${concept.projectId}`);
+      } catch (fallbackError) {
+        const message =
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : error instanceof Error
+              ? error.message
+              : "Could not generate a home concept.";
+
+        setFormError(message);
+        setSubmitting(false);
+      }
     }
   }
 
@@ -275,7 +314,7 @@ export function StudioWizard({
             </label>
             <p className="text-sm text-[color:var(--muted)]">
               Minimum {MIN_DESCRIPTION_LENGTH} characters. The better the brief,
-              the more believable the mock concept.
+              the stronger the generated concept.
             </p>
           </div>
         ) : null}
@@ -287,9 +326,9 @@ export function StudioWizard({
                 Upload inspiration images
               </CardTitle>
               <CardDescription>
-                The starter uses a mocked vision pass to extract style cues from
-                filenames and metadata, giving you a clean place to wire real
-                image analysis later.
+                The current flow uses a lightweight vision placeholder to pull
+                style cues from filenames and metadata, giving you a clean place
+                to wire richer image analysis later.
               </CardDescription>
             </div>
             <label className="block rounded-[1.75rem] border border-dashed border-[color:var(--border)] bg-[color:var(--surface-strong)] p-8 text-center">
@@ -434,8 +473,8 @@ export function StudioWizard({
                 Review before generation
               </CardTitle>
               <CardDescription>
-                Submit the form to create a mock concept package and route into
-                the results dashboard shell.
+                Submit the form to generate a concept package and route into the
+                results dashboard shell.
               </CardDescription>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -462,7 +501,7 @@ export function StudioWizard({
             {styleAnalysis ? (
               <div className="rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                  Mock analysis preview
+                  Inspiration analysis preview
                 </p>
                 <p className="mt-3 leading-7 text-[color:var(--foreground)]">
                   {styleAnalysis.summary}

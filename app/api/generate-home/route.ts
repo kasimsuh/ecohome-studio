@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { generateStructuredHomeConceptWithFeatherless } from "@/lib/ai/featherless";
 import { generateHomeRequestSchema } from "@/lib/domain/home-concept-schema";
 import { createFallbackStructuredHomeConcept } from "@/lib/domain/structured-home-fallback";
-import { retrieveGroundingGuidance } from "@/lib/rag/watsonx";
+import { retrieveSustainabilityContext } from "@/lib/rag/retriever";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   }
 
   const input = parsed.data;
-  const guidance = await retrieveGroundingGuidance(input);
+  const guidance = await retrieveSustainabilityContext(input);
 
   try {
     const concept = await generateStructuredHomeConceptWithFeatherless({

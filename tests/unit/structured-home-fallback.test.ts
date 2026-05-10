@@ -27,5 +27,12 @@ describe("createFallbackStructuredHomeConcept", () => {
     expect(concept.location).toBe("Toronto, Canada");
     expect(concept.climateType).toBe("cold");
     expect(concept.guidanceSnippets).toHaveLength(1);
+    expect(concept.sources).toEqual([
+      {
+        title: "Cold climate envelope",
+        source: "climate-resilience.md",
+        filename: "climate-resilience.md",
+      },
+    ]);
   });
 });
