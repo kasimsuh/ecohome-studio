@@ -50,10 +50,15 @@ export function ResultsClient({ projectId }: { projectId: string }) {
   if (!ready) {
     return (
       <Card className="p-8">
-        <CardTitle>Loading your concept</CardTitle>
-        <CardDescription>
-          Pulling the latest generated project from session storage.
-        </CardDescription>
+        <div className="flex flex-col items-center gap-6 py-8 text-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-[color:var(--border)] border-t-[color:var(--accent)]" />
+          <div>
+            <CardTitle>Preparing your results</CardTitle>
+            <CardDescription>
+              Just a moment while we load your concept.
+            </CardDescription>
+          </div>
+        </div>
       </Card>
     );
   }

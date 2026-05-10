@@ -267,72 +267,85 @@ export function StudioWizard({
   }
 
   return (
-    <form onSubmit={handleGenerate} className="space-y-8">
-      <Card className="rounded-[2rem] p-6">
+    <form onSubmit={handleGenerate} className="flex h-full w-full flex-col">
+      <div className="shrink-0 pb-4">
         <StudioWizardSteps stepIndex={stepIndex} />
-      </Card>
-
-      <Card className="rounded-[2rem] p-8">
-        {stepIndex === 0 ? (
-          <StudioBriefStep
-            description={formState.description}
-            onDescriptionChange={(value) => updateFormState("description", value)}
-          />
-        ) : null}
-
-        {stepIndex === 1 ? (
-          <StudioInspirationStep
-            analysisPending={analysisPending}
-            styleAnalysis={styleAnalysis}
-            uploadError={uploadError}
-            onFileSelection={handleFileSelection}
-          />
-        ) : null}
-
-        {stepIndex === 2 ? (
-          <StudioContextStep
-            budgetLevel={formState.budgetLevel}
-            climateRegion={formState.climateRegion}
-            location={formState.location}
-            onBudgetLevelChange={(value) => updateFormState("budgetLevel", value)}
-            onClimateRegionChange={(value) => updateFormState("climateRegion", value)}
-            onLocationChange={(value) => updateFormState("location", value)}
-          />
-        ) : null}
-
-        {stepIndex === 3 ? (
-          <StudioReviewStep styleAnalysis={styleAnalysis} summary={reviewSummary} />
-        ) : null}
-
-        {formError ? <StudioWizardAlert message={formError} /> : null}
-      </Card>
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="text-sm leading-6 text-[color:var(--muted)]">
-          Want to inspect a complete sample without generating one?
-          {" "}
-          <Link href="/results/demo" className="font-semibold text-[color:var(--accent)]">
-            Open the demo result
-          </Link>
-          .
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button
-            variant="secondary"
-            onClick={handleBack}
-            disabled={stepIndex === 0 || submitting}
-          >
-            Back
-          </Button>
-          {stepIndex < steps.length - 1 ? (
-            <Button onClick={handleNext}>Continue</Button>
-          ) : (
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Generating concept..." : "Generate concept"}
-            </Button>
-          )}
-        </div>
       </div>
+
+      {submitting ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-6">
+          <div className="h-12 w-12 animate-spin rounded-full border-[3px] border-[color:var(--border)] border-t-[color:var(--accent)]" />
+          <div className="space-y-2 text-center">
+            <p className="font-tech text-xl tracking-[0.03em] text-[color:var(--foreground)]">
+              Designing your home concept
+            </p>
+            <p className="text-sm text-[color:var(--muted)]">
+              This takes about 30 seconds. Your concept is being generated now.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <Card className="min-h-0 flex-1 overflow-y-auto rounded-[2rem] p-8">
+            {stepIndex === 0 ? (
+              <StudioBriefStep
+                description={formState.description}
+                onDescriptionChange={(value) => updateFormState("description", value)}
+              />
+            ) : null}
+
+            {stepIndex === 1 ? (
+              <StudioInspirationStep
+                analysisPending={analysisPending}
+                styleAnalysis={styleAnalysis}
+                uploadError={uploadError}
+                onFileSelection={handleFileSelection}
+              />
+            ) : null}
+
+            {stepIndex === 2 ? (
+              <StudioContextStep
+                budgetLevel={formState.budgetLevel}
+                climateRegion={formState.climateRegion}
+                location={formState.location}
+                onBudgetLevelChange={(value) => updateFormState("budgetLevel", value)}
+                onClimateRegionChange={(value) => updateFormState("climateRegion", value)}
+                onLocationChange={(value) => updateFormState("location", value)}
+              />
+            ) : null}
+
+            {stepIndex === 3 ? (
+              <StudioReviewStep styleAnalysis={styleAnalysis} summary={reviewSummary} />
+            ) : null}
+
+            {formError ? <StudioWizardAlert message={formError} /> : null}
+          </Card>
+
+          <div className="flex shrink-0 flex-col gap-4 pt-4 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm leading-6 text-[color:var(--muted)]">
+              Want to inspect a complete sample without generating one?{" "}
+              <Link href="/results/demo" className="font-semibold text-[color:var(--accent)]">
+                Open the demo result
+              </Link>
+              .
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="secondary"
+                onClick={handleBack}
+                disabled={stepIndex === 0}
+              >
+                Back
+              </Button>
+              {stepIndex < steps.length - 1 ? (
+                <Button onClick={handleNext}>Continue</Button>
+              ) : (
+                <Button type="submit">Generate concept</Button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </form>
   );
 }

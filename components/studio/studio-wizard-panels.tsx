@@ -41,60 +41,51 @@ function StepHeader({
   );
 }
 
-function OptionCard({
-  active,
-  label,
-  hint,
-  onClick
-}: {
-  active: boolean;
-  label: string;
-  hint: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-[1.5rem] border p-4 text-left transition",
-        active
-          ? "border-[color:var(--accent)] bg-[color:var(--surface-strong)]"
-          : "border-[color:var(--border)] bg-transparent hover:bg-[color:var(--surface-strong)]"
-      )}
-    >
-      <p className="text-lg text-[color:var(--foreground)]">{label}</p>
-      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{hint}</p>
-    </button>
-  );
-}
 
 export function StudioWizardSteps({ stepIndex }: { stepIndex: number }) {
   const steps = ["Vision", "Inspiration", "Context", "Review"];
 
   return (
-    <div className="grid gap-4 md:grid-cols-4">
+    <div className="flex items-start gap-0">
       {steps.map((step, index) => {
         const active = index === stepIndex;
         const complete = index < stepIndex;
 
         return (
-          <div
-            key={step}
-            className={cn(
-              "rounded-[1.5rem] border p-4 transition",
-              active
-                ? "border-[color:var(--accent)] bg-[color:var(--surface-strong)]"
-                : "border-[color:var(--border)] bg-transparent",
-              complete && "bg-[color:var(--accent-soft)]"
-            )}
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-              Step {index + 1}
-            </p>
-            <p className="font-tech mt-2 text-xl tracking-[0.03em] text-[color:var(--foreground)]">
-              {step}
-            </p>
+          <div key={step} className="flex flex-1 items-start">
+            <div className="flex flex-col items-center gap-2">
+              <div
+                className={cn(
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition",
+                  complete
+                    ? "bg-[color:var(--accent)] text-white"
+                    : active
+                      ? "bg-[color:var(--foreground)] text-[color:var(--surface)]"
+                      : "border border-[color:var(--border)] text-[color:var(--muted)]"
+                )}
+              >
+                {complete ? (
+                  <svg viewBox="0 0 12 10" className="h-3 w-3 fill-none stroke-current stroke-2">
+                    <polyline points="1,5 4.5,8.5 11,1" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  index + 1
+                )}
+              </div>
+              <span
+                className={cn(
+                  "text-xs font-semibold",
+                  active || complete
+                    ? "text-[color:var(--foreground)]"
+                    : "text-[color:var(--muted)]"
+                )}
+              >
+                {step}
+              </span>
+            </div>
+            {index < steps.length - 1 ? (
+              <div className="mx-2 mt-4 h-px flex-1 bg-[color:var(--border)]" />
+            ) : null}
           </div>
         );
       })}
@@ -145,16 +136,16 @@ export function StudioInspirationStep({
   onFileSelection: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StepHeader
         title="Upload inspiration images"
         description="The current flow uses a lightweight vision placeholder to pull style cues from filenames and metadata, giving you a clean place to wire richer image analysis later."
       />
-      <label className="block rounded-[1.75rem] border border-dashed border-[color:var(--border)] bg-[color:var(--surface-strong)] p-8 text-center">
+      <label className="block rounded-[1.75rem] border border-dashed border-[color:var(--border)] bg-[color:var(--surface-strong)] px-6 py-5 text-center">
         <span className="text-lg font-semibold text-[color:var(--foreground)]">
           Drop JPG, PNG, or WEBP inspiration images here
         </span>
-        <span className="mt-2 block text-sm leading-6 text-[color:var(--muted)]">
+        <span className="mt-1.5 block text-sm leading-6 text-[color:var(--muted)]">
           Up to {MAX_INSPIRATION_IMAGES} files. Use filenames like
           `warm-wood-modern-home.jpg` to make the mocked analysis feel more intentional.
         </span>
@@ -163,7 +154,7 @@ export function StudioInspirationStep({
           type="file"
           accept={ALLOWED_IMAGE_TYPES.join(",")}
           multiple
-          className="mt-6 block w-full cursor-pointer text-sm text-[color:var(--muted)]"
+          className="mt-3 block w-full cursor-pointer text-sm text-[color:var(--muted)]"
           onChange={onFileSelection}
         />
       </label>
@@ -173,9 +164,12 @@ export function StudioInspirationStep({
         </p>
       ) : null}
       {analysisPending ? (
-        <p className="text-sm font-semibold text-[color:var(--accent)]">
-          Analyzing inspiration direction...
-        </p>
+        <div className="flex items-center gap-3">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-[color:var(--border)] border-t-[color:var(--accent)]" />
+          <p className="text-sm font-semibold text-[color:var(--accent)]">
+            Analyzing your inspiration images...
+          </p>
+        </div>
       ) : null}
       {styleAnalysis ? (
         <div className="grid gap-4 rounded-[1.75rem] bg-[color:var(--surface-muted)] p-5 md:grid-cols-2">
@@ -238,39 +232,65 @@ export function StudioContextStep({
         />
       </label>
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-[color:var(--foreground)]">
+        <label className="block space-y-2">
+          <span className="text-sm font-semibold text-[color:var(--foreground)]">
             Climate region
-          </p>
-          <div className="grid gap-3">
-            {climateOptions.map((option) => (
-              <OptionCard
-                key={option.value}
-                active={climateRegion === option.value}
-                label={option.label}
-                hint={option.hint}
-                onClick={() => onClimateRegionChange(option.value)}
-              />
-            ))}
+          </span>
+          <div className="relative">
+            <select
+              value={climateRegion}
+              onChange={(e) => onClimateRegionChange(e.target.value as ClimateRegion)}
+              className="w-full appearance-none rounded-[1.25rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-4 py-3 pr-10 text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]"
+            >
+              {climateOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <svg
+              viewBox="0 0 12 8"
+              className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 fill-none stroke-[color:var(--muted)] stroke-2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="1,1 6,7 11,1" />
+            </svg>
           </div>
-        </div>
+          <p className="text-sm leading-6 text-[color:var(--muted)]">
+            {climateOptions.find((o) => o.value === climateRegion)?.hint}
+          </p>
+        </label>
 
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-[color:var(--foreground)]">
+        <label className="block space-y-2">
+          <span className="text-sm font-semibold text-[color:var(--foreground)]">
             Budget level
-          </p>
-          <div className="grid gap-3">
-            {budgetOptions.map((option) => (
-              <OptionCard
-                key={option.value}
-                active={budgetLevel === option.value}
-                label={option.label}
-                hint={option.hint}
-                onClick={() => onBudgetLevelChange(option.value)}
-              />
-            ))}
+          </span>
+          <div className="relative">
+            <select
+              value={budgetLevel}
+              onChange={(e) => onBudgetLevelChange(e.target.value as FormState["budgetLevel"])}
+              className="w-full appearance-none rounded-[1.25rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-4 py-3 pr-10 text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]"
+            >
+              {budgetOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <svg
+              viewBox="0 0 12 8"
+              className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 fill-none stroke-[color:var(--muted)] stroke-2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="1,1 6,7 11,1" />
+            </svg>
           </div>
-        </div>
+          <p className="text-sm leading-6 text-[color:var(--muted)]">
+            {budgetOptions.find((o) => o.value === budgetLevel)?.hint}
+          </p>
+        </label>
       </div>
     </div>
   );
