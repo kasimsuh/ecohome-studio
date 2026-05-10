@@ -3,7 +3,12 @@
 import { useMemo, useState } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Sky, Environment, ContactShadows } from "@react-three/drei";
+import {
+  OrbitControls,
+  Sky,
+  Environment,
+  ContactShadows,
+} from "@react-three/drei";
 
 import { FloorPlanDrawing } from "@/components/results/floor-plan-2d";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -173,7 +178,10 @@ function Window({
         <meshStandardMaterial color="#3d3a32" roughness={0.7} />
       </mesh>
       {/* Exterior sill – protruding shelf below the frame */}
-      <mesh position={[0, -h / 2 - frameT * 0.6, frameDepth / 2 + 0.06]} castShadow>
+      <mesh
+        position={[0, -h / 2 - frameT * 0.6, frameDepth / 2 + 0.06]}
+        castShadow
+      >
         <boxGeometry args={[w + frameT * 2 + 0.12, 0.06, 0.15]} />
         <meshStandardMaterial color="#3d3a32" roughness={0.75} />
       </mesh>
@@ -520,7 +528,11 @@ function HipRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
   return (
     <group position={[0, top, 0]}>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshStandardMaterial color="#4a4339" side={THREE.DoubleSide} roughness={0.92} />
+        <meshStandardMaterial
+          color="#4a4339"
+          side={THREE.DoubleSide}
+          roughness={0.92}
+        />
       </mesh>
       {/* Eave fascia – all 4 edges */}
       <mesh position={[0, 0.05, d / 2]} castShadow>
@@ -832,7 +844,11 @@ function Trees({ floorPlan }: { floorPlan: FloorPlan }) {
         const mid = hue > 1 ? "#5b8a4d" : "#6e9a58";
         const light = "#79a861";
         return (
-          <group key={`tree-${i}`} position={[x, 0, z]} scale={[scale, scale, scale]}>
+          <group
+            key={`tree-${i}`}
+            position={[x, 0, z]}
+            scale={[scale, scale, scale]}
+          >
             {/* Tapered trunk – two stacked cylinders */}
             <mesh position={[0, 0.3, 0]} castShadow receiveShadow>
               <cylinderGeometry args={[0.09, 0.14, 0.6, 10]} />
@@ -856,12 +872,12 @@ function Trees({ floorPlan }: { floorPlan: FloorPlan }) {
               <meshStandardMaterial color={mid} roughness={0.92} />
             </mesh>
             <mesh position={[0.1, 1.72, 0.08]} castShadow>
-              <sphereGeometry args={[0.30, 12, 12]} />
+              <sphereGeometry args={[0.3, 12, 12]} />
               <meshStandardMaterial color={light} roughness={0.91} />
             </mesh>
             <mesh position={[-0.12, 1.9, -0.1]} castShadow>
               <sphereGeometry args={[0.22, 10, 10]} />
-              <meshStandardMaterial color={light} roughness={0.90} />
+              <meshStandardMaterial color={light} roughness={0.9} />
             </mesh>
           </group>
         );
@@ -905,17 +921,27 @@ function EntryCanopy({
   return (
     <group position={[doorX, canopyY, floorPlan.height / 2]}>
       {/* Canopy slab */}
-      <mesh castShadow receiveShadow position={[0, slabT / 2, canopyProtrude / 2]}>
+      <mesh
+        castShadow
+        receiveShadow
+        position={[0, slabT / 2, canopyProtrude / 2]}
+      >
         <boxGeometry args={[canopyW, slabT, canopyProtrude]} />
         <meshStandardMaterial color="#3d3a32" roughness={0.78} />
       </mesh>
       {/* Left support post */}
-      <mesh castShadow position={[-(canopyW / 2 - 0.07), -postH / 2, canopyProtrude - 0.05]}>
+      <mesh
+        castShadow
+        position={[-(canopyW / 2 - 0.07), -postH / 2, canopyProtrude - 0.05]}
+      >
         <boxGeometry args={[0.09, postH, 0.09]} />
         <meshStandardMaterial color="#2f2c25" roughness={0.85} />
       </mesh>
       {/* Right support post */}
-      <mesh castShadow position={[canopyW / 2 - 0.07, -postH / 2, canopyProtrude - 0.05]}>
+      <mesh
+        castShadow
+        position={[canopyW / 2 - 0.07, -postH / 2, canopyProtrude - 0.05]}
+      >
         <boxGeometry args={[0.09, postH, 0.09]} />
         <meshStandardMaterial color="#2f2c25" roughness={0.85} />
       </mesh>
@@ -934,7 +960,13 @@ function HomeScene({
 
   return (
     <>
-      <Sky sunPosition={[50, 20, 30]} turbidity={5} rayleigh={0.5} mieCoefficient={0.005} mieDirectionalG={0.8} />
+      <Sky
+        sunPosition={[50, 20, 30]}
+        turbidity={5}
+        rayleigh={0.5}
+        mieCoefficient={0.005}
+        mieDirectionalG={0.8}
+      />
       <Environment preset="sunset" />
       <ambientLight intensity={0.22} />
       <directionalLight
@@ -954,7 +986,13 @@ function HomeScene({
       <directionalLight position={[-10, 8, -6]} intensity={0.3} />
 
       <Ground floorPlan={floorPlan} />
-      <ContactShadows position={[0, 0.02, 0]} opacity={0.32} scale={50} blur={2.8} far={12} />
+      <ContactShadows
+        position={[0, 0.02, 0]}
+        opacity={0.32}
+        scale={50}
+        blur={2.8}
+        far={12}
+      />
       <Foundation floorPlan={floorPlan} />
       <WallsWithOpenings floorPlan={floorPlan} model3D={model3D} />
       <Roof floorPlan={floorPlan} model3D={model3D} />
@@ -991,7 +1029,10 @@ function HomeScene({
   );
 }
 
-const featureDescriptions: Record<keyof Model3D["sustainabilityFeatures"], { headline: string; body: string }> = {
+const featureDescriptions: Record<
+  keyof Model3D["sustainabilityFeatures"],
+  { headline: string; body: string }
+> = {
   solarPanels: {
     headline: "Solar array",
     body: "Photovoltaic panels are integrated across your roof, converting sunlight directly into electricity. This cuts your energy bills, reduces dependence on the grid, and lowers your home's lifetime carbon footprint — often producing more energy than the home consumes.",
@@ -1071,7 +1112,9 @@ export function Home3DPreview({
   variant?: "card" | "workspace";
 }) {
   const [showFloorPlan, setShowFloorPlan] = useState(false);
-  const [selectedFeature, setSelectedFeature] = useState<keyof Model3D["sustainabilityFeatures"] | null>(null);
+  const [selectedFeature, setSelectedFeature] = useState<
+    keyof Model3D["sustainabilityFeatures"] | null
+  >(null);
 
   function toggleFeature(key: keyof Model3D["sustainabilityFeatures"]) {
     setSelectedFeature((prev) => (prev === key ? null : key));
@@ -1156,8 +1199,14 @@ export function Home3DPreview({
                     <span
                       className="inline-block h-2 w-2 rounded-full"
                       style={{
-                        backgroundColor: selectedFeature === feature.key ? "rgba(255,255,255,0.7)" : feature.color,
-                        boxShadow: selectedFeature === feature.key ? "none" : `0 0 8px ${feature.color}`,
+                        backgroundColor:
+                          selectedFeature === feature.key
+                            ? "rgba(255,255,255,0.7)"
+                            : feature.color,
+                        boxShadow:
+                          selectedFeature === feature.key
+                            ? "none"
+                            : `0 0 8px ${feature.color}`,
                       }}
                       aria-hidden
                     />
@@ -1221,10 +1270,7 @@ export function Home3DPreview({
               </button>
             </div>
             <div className="overflow-auto px-8 py-6">
-              <FloorPlanDrawing
-                floorPlan={floorPlan}
-                model3D={model3D}
-              />
+              <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} />
             </div>
           </div>
         ) : null}
@@ -1299,10 +1345,7 @@ export function Home3DPreview({
                   Close
                 </button>
               </div>
-              <FloorPlanDrawing
-                floorPlan={floorPlan}
-                model3D={model3D}
-              />
+              <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} />
             </div>
           ) : null}
         </div>
@@ -1328,8 +1371,14 @@ export function Home3DPreview({
                     <span
                       className="inline-block h-2 w-2 rounded-full"
                       style={{
-                        backgroundColor: selectedFeature === feature.key ? "rgba(255,255,255,0.7)" : feature.color,
-                        boxShadow: selectedFeature === feature.key ? "none" : `0 0 8px ${feature.color}`,
+                        backgroundColor:
+                          selectedFeature === feature.key
+                            ? "rgba(255,255,255,0.7)"
+                            : feature.color,
+                        boxShadow:
+                          selectedFeature === feature.key
+                            ? "none"
+                            : `0 0 8px ${feature.color}`,
                       }}
                       aria-hidden
                     />
