@@ -1,10 +1,7 @@
 import { budgetLabels, climateLabels } from "@/lib/domain/constants";
 import type { GeneratedHomeConcept } from "@/lib/domain/types";
 import { formatDate } from "@/lib/utils";
-import { FloorPlan2D } from "@/components/results/floor-plan-2d";
 import { Home3DPreview } from "@/components/results/home-3d-preview";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { SectionHeading } from "@/components/ui/section-heading";
 
 const scoreFields: Array<{
   key: keyof GeneratedHomeConcept["sustainabilityScore"];
@@ -18,14 +15,33 @@ const scoreFields: Array<{
   { key: "environmentalImpact", label: "Environmental impact" }
 ];
 
+function ReportSection({
+  title,
+  children
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-t border-[rgba(61,93,72,0.16)] py-6 first:border-t-0 first:pt-0">
+      <h2 className="font-tech text-lg tracking-[0.03em] text-[color:var(--foreground)]">
+        {title}
+      </h2>
+      <div className="mt-4 space-y-4 text-[0.95rem] leading-7 text-[color:var(--muted)]">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between text-sm">
+      <div className="mb-2 flex items-center justify-between gap-4 text-sm">
         <span className="text-[color:var(--muted)]">{label}</span>
         <span className="font-semibold text-[color:var(--foreground)]">{value}</span>
       </div>
-      <div className="h-2 rounded-full bg-[rgba(31,107,82,0.08)]">
+      <div className="h-2 rounded-full bg-[rgba(31,107,82,0.09)]">
         <div
           className="h-2 rounded-full bg-[color:var(--accent)]"
           style={{ width: `${value}%` }}
@@ -35,61 +51,42 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
+function ReportRail({ project }: { project: GeneratedHomeConcept }) {
   return (
-    <div className="space-y-12">
-      <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="overflow-hidden rounded-[2rem] p-8">
-          <div className="flex flex-wrap gap-3 text-sm text-[color:var(--muted)]">
-            <span className="rounded-full bg-[color:var(--accent-soft)] px-4 py-2">
-              {climateLabels[project.climateRegion]}
-            </span>
-            <span className="rounded-full bg-[color:var(--surface-muted)] px-4 py-2">
-              {budgetLabels[project.budgetLevel]}
-            </span>
-            <span className="rounded-full bg-[color:var(--surface-muted)] px-4 py-2">
-              Generated {formatDate(project.generatedAt)}
-            </span>
-          </div>
-          <div className="mt-8 space-y-5">
-            <h1 className="font-tech max-w-3xl text-5xl leading-[1.04] tracking-[0.03em] text-[color:var(--foreground)]">
-              {project.heroTitle}
-            </h1>
-            <p className="max-w-3xl text-lg leading-8 text-[color:var(--muted)]">
-              {project.summary}
-            </p>
-          </div>
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            <div className="rounded-[1.5rem] bg-[color:var(--surface-muted)] p-5">
-              <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                Climate response
-              </p>
-              <p className="mt-3 leading-7 text-[color:var(--foreground)]">
-                {project.climateNarrative}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] bg-[color:var(--surface-muted)] p-5">
-              <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                Budget strategy
-              </p>
-              <p className="mt-3 leading-7 text-[color:var(--foreground)]">
-                {project.budgetNarrative}
-              </p>
-            </div>
-          </div>
-        </Card>
+    <aside className="bg-[linear-gradient(180deg,rgba(255,250,242,0.78),rgba(232,221,202,0.66))] backdrop-blur-2xl lg:h-screen lg:overflow-y-auto lg:border-r lg:border-[rgba(61,93,72,0.16)]">
+      <div className="mx-auto w-full max-w-[46rem] px-5 py-6 lg:max-w-none lg:px-6 lg:py-7">
+        <div className="mb-6 flex flex-wrap gap-2 text-xs font-semibold text-[color:var(--muted)]">
+          <span className="rounded-full bg-[color:var(--accent-soft)] px-3 py-1.5">
+            {climateLabels[project.climateRegion]}
+          </span>
+          <span className="rounded-full bg-[rgba(255,248,239,0.8)] px-3 py-1.5">
+            {budgetLabels[project.budgetLevel]}
+          </span>
+          <span className="rounded-full bg-[rgba(255,248,239,0.8)] px-3 py-1.5">
+            {formatDate(project.generatedAt)}
+          </span>
+        </div>
 
-        <Card className="rounded-[2rem] p-8">
-          <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-            Sustainability score
+        <section className="pb-7">
+          <p className="font-tech text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--accent)]">
+            EcoHome report
           </p>
-          <div className="mt-4 flex items-end gap-4">
-            <p className="text-6xl font-semibold text-[color:var(--foreground)]">
+          <h1 className="font-tech mt-3 text-3xl leading-[1.05] tracking-[0.03em] text-[color:var(--foreground)]">
+            {project.heroTitle}
+          </h1>
+          <p className="mt-4 text-base leading-8 text-[color:var(--muted)]">
+            {project.summary}
+          </p>
+        </section>
+
+        <ReportSection title="Sustainability Score">
+          <div className="flex items-end gap-3">
+            <p className="text-5xl font-semibold text-[color:var(--foreground)]">
               {project.sustainabilityScore.total}
             </p>
             <p className="pb-2 text-sm text-[color:var(--muted)]">out of 100</p>
           </div>
-          <div className="mt-8 space-y-4">
+          <div className="space-y-4">
             {scoreFields.map((field) => (
               <ScoreBar
                 key={field.key}
@@ -98,165 +95,160 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
               />
             ))}
           </div>
-        </Card>
-      </section>
+        </ReportSection>
 
-      <section className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
-        <div className="space-y-8">
-          <SectionHeading
-            kicker="Design direction"
-            title="Architecture, interior, and floor plan ideas"
-            description="These sections are intentionally structured for a hackathon demo: easy to read, easy to swap with provider output later."
-          />
-          <Card className="p-6">
-            <CardTitle>Architectural style</CardTitle>
-            <CardDescription>{project.architecturalStyle}</CardDescription>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[color:var(--muted)]">
-                  Exterior concepts
-                </p>
-                <ul className="mt-3 space-y-2 leading-7 text-[color:var(--foreground)]">
-                  {project.exteriorConcepts.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-[color:var(--muted)]">
-                  Interior concepts
-                </p>
-                <ul className="mt-3 space-y-2 leading-7 text-[color:var(--foreground)]">
-                  {project.interiorConcepts.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-6">
-            <CardTitle>Floor plan ideas</CardTitle>
-            <ul className="mt-4 space-y-3 leading-7 text-[color:var(--foreground)]">
-              {project.floorPlanIdeas.map((item) => (
+        <ReportSection title="Climate And Budget">
+          <div>
+            <p className="font-tech text-xs uppercase tracking-[0.16em] text-[color:var(--muted)]">
+              Climate response
+            </p>
+            <p className="mt-2 text-[color:var(--foreground)]">
+              {project.climateNarrative}
+            </p>
+          </div>
+          <div>
+            <p className="font-tech text-xs uppercase tracking-[0.16em] text-[color:var(--muted)]">
+              Budget strategy
+            </p>
+            <p className="mt-2 text-[color:var(--foreground)]">
+              {project.budgetNarrative}
+            </p>
+          </div>
+        </ReportSection>
+
+        <ReportSection title="Design Direction">
+          <div>
+            <p className="font-semibold text-[color:var(--foreground)]">
+              {project.architecturalStyle}
+            </p>
+          </div>
+          <div>
+            <p className="font-tech text-xs uppercase tracking-[0.16em] text-[color:var(--muted)]">
+              Exterior
+            </p>
+            <ul className="mt-2 space-y-2">
+              {project.exteriorConcepts.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
-          </Card>
-        </div>
-
-        <div className="space-y-8">
-          <Card className="p-6">
-            <CardTitle>Sustainability upgrades</CardTitle>
-            <div className="mt-5 grid gap-4">
-              {project.sustainabilityUpgrades.map((upgrade) => (
-                <div
-                  key={upgrade.title}
-                  className="rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] p-5"
-                >
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h3 className="text-xl text-[color:var(--foreground)]">
-                      {upgrade.title}
-                    </h3>
-                    <span className="rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--accent-dark)]">
-                      {upgrade.category}
-                    </span>
-                    <span className="rounded-full bg-[color:var(--surface-muted)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                      {upgrade.impact} impact
-                    </span>
-                  </div>
-                  <p className="mt-3 leading-7 text-[color:var(--muted)]">
-                    {upgrade.rationale}
-                  </p>
-                  <p className="mt-3 text-sm font-semibold text-[color:var(--foreground)]">
-                    {upgrade.estimatedSavings}
-                  </p>
-                </div>
+          </div>
+          <div>
+            <p className="font-tech text-xs uppercase tracking-[0.16em] text-[color:var(--muted)]">
+              Interior
+            </p>
+            <ul className="mt-2 space-y-2">
+              {project.interiorConcepts.map((item) => (
+                <li key={item}>{item}</li>
               ))}
-            </div>
-          </Card>
+            </ul>
+          </div>
+        </ReportSection>
 
-          <Card className="p-6">
-            <CardTitle>Environmental impact snapshot</CardTitle>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              {[
-                ["Energy reduction", project.environmentalImpact.energyReduction],
-                ["Water reduction", project.environmentalImpact.waterReduction],
-                [
-                  "Embodied carbon",
-                  project.environmentalImpact.embodiedCarbonReduction
-                ],
-                ["Resilience gain", project.environmentalImpact.resilienceGain]
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-[1.5rem] bg-[color:var(--surface-muted)] p-4"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                    {label}
-                  </p>
-                  <p className="mt-3 text-2xl font-semibold text-[color:var(--foreground)]">
-                    {value}
-                  </p>
+        <ReportSection title="Floor Plan Ideas">
+          <ul className="space-y-2">
+            {project.floorPlanIdeas.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </ReportSection>
+
+        <ReportSection title="Sustainability Upgrades">
+          <div className="space-y-4">
+            {project.sustainabilityUpgrades.map((upgrade) => (
+              <article key={upgrade.title}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold text-[color:var(--foreground)]">
+                    {upgrade.title}
+                  </h3>
+                  <span className="rounded-full bg-[color:var(--accent-soft)] px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[color:var(--accent-dark)]">
+                    {upgrade.category}
+                  </span>
+                  <span className="rounded-full bg-[rgba(255,248,239,0.8)] px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                    {upgrade.impact} impact
+                  </span>
                 </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      </section>
+                <p className="mt-2">{upgrade.rationale}</p>
+                <p className="mt-1 text-sm font-semibold text-[color:var(--foreground)]">
+                  {upgrade.estimatedSavings}
+                </p>
+              </article>
+            ))}
+          </div>
+        </ReportSection>
 
-      {project.floorPlan && project.model3D ? (
+        <ReportSection title="Environmental Impact">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            {[
+              ["Energy reduction", project.environmentalImpact.energyReduction],
+              ["Water reduction", project.environmentalImpact.waterReduction],
+              ["Embodied carbon", project.environmentalImpact.embodiedCarbonReduction],
+              ["Resilience gain", project.environmentalImpact.resilienceGain]
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="rounded-[1rem] bg-[rgba(255,248,239,0.72)] p-3"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  {label}
+                </p>
+                <p className="mt-2 text-xl font-semibold text-[color:var(--foreground)]">
+                  {value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </ReportSection>
+
+        <ReportSection title="Design Principles">
+          <ul className="space-y-2">
+            {project.designPrinciples.map((principle) => (
+              <li key={principle}>{principle}</li>
+            ))}
+          </ul>
+          {project.styleAnalysis ? (
+            <p className="rounded-[1rem] bg-[rgba(255,248,239,0.72)] p-3 text-[color:var(--foreground)]">
+              {project.styleAnalysis.summary}
+            </p>
+          ) : null}
+        </ReportSection>
+
+        <ReportSection title="Visual Prompt Starters">
+          <div className="space-y-4">
+            {project.visualPrompts.map((prompt) => (
+              <article key={prompt.label}>
+                <p className="font-tech text-xs uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  {prompt.label}
+                </p>
+                <p className="mt-2 text-[color:var(--foreground)]">{prompt.prompt}</p>
+                <p className="mt-1 text-sm">{prompt.note}</p>
+              </article>
+            ))}
+          </div>
+        </ReportSection>
+      </div>
+    </aside>
+  );
+}
+
+export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
+  const hasInteractiveModel = Boolean(project.floorPlan && project.model3D);
+
+  if (!hasInteractiveModel || !project.floorPlan || !project.model3D) {
+    return <ReportRail project={project} />;
+  }
+
+  return (
+    <div className="min-h-screen lg:grid lg:h-screen lg:grid-cols-[420px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[460px_minmax(0,1fr)]">
+      <ReportRail project={project} />
+      <main className="min-h-[72vh] lg:h-screen lg:min-h-0">
         <Home3DPreview
           floorPlan={project.floorPlan}
           model3D={project.model3D}
           upgrades={project.upgrades}
           materials={project.materials}
+          variant="workspace"
         />
-      ) : null}
-
-      {project.floorPlan && project.model3D ? (
-        <FloorPlan2D floorPlan={project.floorPlan} model3D={project.model3D} />
-      ) : null}
-
-      <section className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
-          <Card className="p-6">
-            <CardTitle>Design principles</CardTitle>
-            <ul className="mt-4 space-y-3 leading-7 text-[color:var(--foreground)]">
-              {project.designPrinciples.map((principle) => (
-                <li key={principle}>{principle}</li>
-              ))}
-            </ul>
-            {project.styleAnalysis ? (
-              <div className="mt-6 rounded-[1.5rem] bg-[color:var(--surface-muted)] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                  Inspiration analysis
-                </p>
-                <p className="mt-3 leading-7 text-[color:var(--foreground)]">
-                  {project.styleAnalysis.summary}
-                </p>
-              </div>
-            ) : null}
-          </Card>
-
-        <Card className="p-6">
-          <CardTitle>Visual prompt starters</CardTitle>
-          <div className="mt-5 grid gap-4">
-            {project.visualPrompts.map((prompt) => (
-              <div
-                key={prompt.label}
-                className="rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] p-5"
-              >
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                  {prompt.label}
-                </p>
-                <p className="mt-3 leading-7 text-[color:var(--foreground)]">
-                  {prompt.prompt}
-                </p>
-                <p className="mt-3 text-sm text-[color:var(--muted)]">{prompt.note}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </section>
+      </main>
     </div>
   );
 }

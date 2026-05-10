@@ -8,7 +8,7 @@ export default async function ResultsPage({
   const { projectId } = await params;
 
   return (
-    <div className="shell py-12">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden">
       <ResultsClient projectId={projectId} />
     </div>
   );
