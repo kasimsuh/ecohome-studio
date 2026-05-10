@@ -991,6 +991,70 @@ function HomeScene({
   );
 }
 
+const featureDescriptions: Record<keyof Model3D["sustainabilityFeatures"], { headline: string; body: string }> = {
+  solarPanels: {
+    headline: "Solar array",
+    body: "Photovoltaic panels are integrated across your roof, converting sunlight directly into electricity. This cuts your energy bills, reduces dependence on the grid, and lowers your home's lifetime carbon footprint — often producing more energy than the home consumes.",
+  },
+  greenRoof: {
+    headline: "Living green roof",
+    body: "A planted roof layer of drought-tolerant sedums and grasses acts as natural insulation, slowing heat gain in summer and heat loss in winter. It also absorbs stormwater, supports local biodiversity, and extends the lifespan of the roof membrane beneath.",
+  },
+  rainwaterTank: {
+    headline: "Rainwater harvesting",
+    body: "A dedicated tank captures roof runoff and stores it for garden irrigation, toilet flushing, and laundry. This can cut mains water use by up to 40%, building household resilience during dry periods and reducing pressure on local stormwater systems.",
+  },
+  trees: {
+    headline: "Native canopy",
+    body: "Carefully placed native trees provide summer shading that passively cools the home and outdoor spaces, while shelter from prevailing winds reduces heating demand in winter. Over their lifetime they sequester carbon and create habitat for local wildlife.",
+  },
+  permeableDriveway: {
+    headline: "Permeable driveway",
+    body: "A permeable paving system lets rainwater filter naturally through joints and into the soil below, rather than rushing into stormwater drains. This reduces local flood risk, recharges groundwater, and keeps the site cool by avoiding the heat-island effect of sealed surfaces.",
+  },
+  crossVentilation: {
+    headline: "Cross ventilation",
+    body: "Strategically placed openings on opposite walls channel prevailing breezes through the home, flushing out heat and moisture without any mechanical system. This passive cooling strategy is one of the most effective ways to keep a home comfortable year-round at zero running cost.",
+  },
+};
+
+function FeaturePopup({
+  featureKey,
+  color,
+  onClose,
+}: {
+  featureKey: keyof Model3D["sustainabilityFeatures"];
+  color: string;
+  onClose: () => void;
+}) {
+  const info = featureDescriptions[featureKey];
+  return (
+    <div className="rounded-[1.25rem] border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.96)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.18)] backdrop-blur-xl">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span
+            className="mt-0.5 inline-block h-3 w-3 shrink-0 rounded-full"
+            style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }}
+            aria-hidden
+          />
+          <p className="font-tech text-sm font-semibold uppercase tracking-[0.14em] text-[color:var(--foreground)]">
+            {info.headline}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-2.5 py-1 text-xs font-semibold text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <p className="text-sm leading-6 text-[color:var(--muted)]">{info.body}</p>
+    </div>
+  );
+}
+
 export function Home3DPreview({
   floorPlan,
   model3D,
@@ -1007,6 +1071,11 @@ export function Home3DPreview({
   variant?: "card" | "workspace";
 }) {
   const [showFloorPlan, setShowFloorPlan] = useState(false);
+  const [selectedFeature, setSelectedFeature] = useState<keyof Model3D["sustainabilityFeatures"] | null>(null);
+
+  function toggleFeature(key: keyof Model3D["sustainabilityFeatures"]) {
+    setSelectedFeature((prev) => (prev === key ? null : key));
+  }
   const activeFeatures = useMemo(
     () =>
       (
@@ -1066,51 +1135,67 @@ export function Home3DPreview({
         </div>
 
         <div className="pointer-events-none absolute inset-x-4 bottom-4 z-10 grid gap-3 sm:inset-x-5 sm:bottom-5 xl:grid-cols-[1fr_1fr]">
+          {/* Left col – sustainability badges */}
           <div className="pointer-events-auto rounded-[1.25rem] border border-[rgba(61,93,72,0.16)] bg-[rgba(255,250,242,0.7)] p-3 shadow-[0_18px_55px_rgba(45,39,28,0.12)] backdrop-blur-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-              Sustainability layer
+              Sustainability layer · tap to learn more
             </p>
             <ul className="mt-2 flex flex-wrap gap-2">
               {activeFeatures.map((feature) => (
-                <li
-                  key={feature.key}
-                  className="flex items-center gap-2 rounded-full bg-[rgba(255,248,239,0.88)] px-3 py-1.5 text-xs"
-                >
-                  <span
-                    className="inline-block h-3 w-3 rounded-full"
-                    style={{
-                      backgroundColor: feature.color,
-                      boxShadow: `0 0 8px ${feature.color}`,
-                    }}
-                    aria-hidden
-                  />
-                  <span className="font-semibold text-[color:var(--foreground)]">
+                <li key={feature.key}>
+                  <button
+                    type="button"
+                    onClick={() => toggleFeature(feature.key)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold transition",
+                      selectedFeature === feature.key
+                        ? "bg-[color:var(--accent)] text-white"
+                        : "bg-[rgba(255,248,239,0.88)] text-[color:var(--foreground)] hover:bg-[rgba(255,248,239,1)]",
+                    )}
+                  >
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{
+                        backgroundColor: selectedFeature === feature.key ? "rgba(255,255,255,0.7)" : feature.color,
+                        boxShadow: selectedFeature === feature.key ? "none" : `0 0 8px ${feature.color}`,
+                      }}
+                      aria-hidden
+                    />
                     {feature.label}
-                  </span>
+                  </button>
                 </li>
               ))}
             </ul>
           </div>
 
-          {upgrades?.length ? (
-            <div className="pointer-events-auto hidden rounded-[1.25rem] border border-[rgba(61,93,72,0.16)] bg-[rgba(255,250,242,0.7)] p-3 shadow-[0_18px_55px_rgba(45,39,28,0.12)] backdrop-blur-xl xl:block">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                Top upgrades
-              </p>
-              <div className="mt-2 grid gap-2">
-                {upgrades.slice(0, 2).map((upgrade) => (
-                  <div key={upgrade.title}>
-                    <p className="text-sm font-semibold text-[color:var(--foreground)]">
-                      {upgrade.title}
-                    </p>
-                    <p className="text-xs text-[color:var(--muted)]">
-                      {upgrade.category} · {upgrade.impactLevel} impact
-                    </p>
-                  </div>
-                ))}
+          {/* Right col – feature popup when open, top upgrades when closed */}
+          <div className="pointer-events-auto hidden xl:flex xl:flex-col">
+            {selectedFeature ? (
+              <FeaturePopup
+                featureKey={selectedFeature}
+                color={sustainabilityAccent[selectedFeature]}
+                onClose={() => setSelectedFeature(null)}
+              />
+            ) : upgrades?.length ? (
+              <div className="flex h-full flex-col rounded-[1.25rem] border border-[rgba(61,93,72,0.16)] bg-[rgba(255,250,242,0.7)] p-3 shadow-[0_18px_55px_rgba(45,39,28,0.12)] backdrop-blur-xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  Top upgrades
+                </p>
+                <div className="mt-2 grid gap-2">
+                  {upgrades.slice(0, 2).map((upgrade) => (
+                    <div key={upgrade.title}>
+                      <p className="text-sm font-semibold text-[color:var(--foreground)]">
+                        {upgrade.title}
+                      </p>
+                      <p className="text-xs text-[color:var(--muted)]">
+                        {upgrade.category} · {upgrade.impactLevel} impact
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
 
         {showFloorPlan ? (
@@ -1225,28 +1310,43 @@ export function Home3DPreview({
         <aside className="grid gap-4 xl:grid-cols-[1fr_1fr]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-              Sustainability layer
+              Sustainability layer · tap to learn more
             </p>
             <ul className="mt-3 flex flex-wrap gap-2">
               {activeFeatures.map((feature) => (
-                <li
-                  key={feature.key}
-                  className="flex items-center gap-2 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs"
-                >
-                  <span
-                    className="inline-block h-3 w-3 rounded-full"
-                    style={{
-                      backgroundColor: feature.color,
-                      boxShadow: `0 0 8px ${feature.color}`,
-                    }}
-                    aria-hidden
-                  />
-                  <span className="font-semibold text-[color:var(--foreground)]">
+                <li key={feature.key}>
+                  <button
+                    type="button"
+                    onClick={() => toggleFeature(feature.key)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                      selectedFeature === feature.key
+                        ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-white"
+                        : "border-[color:var(--border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)] hover:border-[color:var(--accent)]",
+                    )}
+                  >
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{
+                        backgroundColor: selectedFeature === feature.key ? "rgba(255,255,255,0.7)" : feature.color,
+                        boxShadow: selectedFeature === feature.key ? "none" : `0 0 8px ${feature.color}`,
+                      }}
+                      aria-hidden
+                    />
                     {feature.label}
-                  </span>
+                  </button>
                 </li>
               ))}
             </ul>
+            {selectedFeature ? (
+              <div className="mt-3">
+                <FeaturePopup
+                  featureKey={selectedFeature}
+                  color={sustainabilityAccent[selectedFeature]}
+                  onClose={() => setSelectedFeature(null)}
+                />
+              </div>
+            ) : null}
           </div>
 
           {upgrades?.length ? (
