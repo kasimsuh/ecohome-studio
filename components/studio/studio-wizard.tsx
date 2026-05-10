@@ -5,9 +5,16 @@ import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import {
-  ALLOWED_IMAGE_TYPES,
+  StudioBriefStep,
+  StudioContextStep,
+  StudioInspirationStep,
+  StudioReviewStep,
+  StudioWizardAlert,
+  StudioWizardSteps
+} from "@/components/studio/studio-wizard-panels";
+import {
   MAX_INSPIRATION_IMAGES,
   MIN_DESCRIPTION_LENGTH,
   budgetOptions,
@@ -27,9 +34,6 @@ import type {
   StyleAnalysis
 } from "@/lib/domain/types";
 import { getProjectStorageKey } from "@/lib/session";
-import { cn } from "@/lib/utils";
-
-const steps = ["Vision", "Inspiration", "Context", "Review"];
 
 interface FormState {
   description: string;
@@ -44,6 +48,8 @@ const initialFormState: FormState = {
   climateRegion: "cold",
   budgetLevel: "medium"
 };
+
+const steps = ["Vision", "Inspiration", "Context", "Review"];
 
 export function StudioWizard({
   initialDescription = ""
@@ -68,14 +74,14 @@ export function StudioWizard({
       description: formState.description,
       location: formState.location,
       climateRegion:
-        climateOptions.find((option) => option.value === formState.climateRegion)?.label ??
-        formState.climateRegion,
+        climateOptions.find((option) => option.value === formState.climateRegion)
+          ?.label ?? formState.climateRegion,
       budgetLevel:
-        budgetOptions.find((option) => option.value === formState.budgetLevel)?.label ??
-        formState.budgetLevel,
+        budgetOptions.find((option) => option.value === formState.budgetLevel)
+          ?.label ?? formState.budgetLevel,
       inspirationCount: inspirationImages.length
     }),
-    [formState, inspirationImages.length]
+    [formState, inspirationImages]
   );
 
   function updateFormState<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -142,7 +148,9 @@ export function StudioWizard({
       return;
     }
 
-    const invalidFile = files.find((file) => !ALLOWED_IMAGE_TYPES.includes(file.type));
+    const invalidFile = files.find(
+      (file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+    );
 
     if (invalidFile) {
       setUploadError("Only JPG, PNG, and WEBP files are supported in this starter.");
@@ -261,264 +269,42 @@ export function StudioWizard({
   return (
     <form onSubmit={handleGenerate} className="space-y-8">
       <Card className="rounded-[2rem] p-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          {steps.map((step, index) => {
-            const active = index === stepIndex;
-            const complete = index < stepIndex;
-
-            return (
-              <div
-                key={step}
-                className={cn(
-                  "rounded-[1.5rem] border p-4 transition",
-                  active
-                    ? "border-[color:var(--accent)] bg-[color:var(--surface-strong)]"
-                    : "border-[color:var(--border)] bg-transparent",
-                  complete && "bg-[color:var(--accent-soft)]"
-                )}
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                  Step {index + 1}
-                </p>
-                <p className="font-tech mt-2 text-xl tracking-[0.03em] text-[color:var(--foreground)]">
-                  {step}
-                </p>
-              </div>
-            );
-          })}
-        </div>
+        <StudioWizardSteps stepIndex={stepIndex} />
       </Card>
 
       <Card className="rounded-[2rem] p-8">
         {stepIndex === 0 ? (
-          <div className="space-y-6">
-            <div>
-              <CardTitle className="font-tech tracking-[0.03em]">
-                Describe the dream home
-              </CardTitle>
-              <CardDescription>
-                Capture style, atmosphere, lifestyle, and spaces that matter so
-                the sustainability layer has something real to work with.
-              </CardDescription>
-            </div>
-            <label className="block">
-              <span className="mb-3 block text-sm font-semibold text-[color:var(--foreground)]">
-                Dream home brief
-              </span>
-              <textarea
-                value={formState.description}
-                onChange={(event) => updateFormState("description", event.target.value)}
-                className="min-h-52 w-full rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-5 py-4 text-[color:var(--foreground)] outline-none ring-0 transition focus:border-[color:var(--accent)]"
-                placeholder="Example: A light-filled family home with a warm modern exterior, flexible office space, durable finishes, and a strong connection to the garden."
-              />
-            </label>
-            <p className="text-sm text-[color:var(--muted)]">
-              Minimum {MIN_DESCRIPTION_LENGTH} characters. The better the brief,
-              the stronger the generated concept.
-            </p>
-          </div>
+          <StudioBriefStep
+            description={formState.description}
+            onDescriptionChange={(value) => updateFormState("description", value)}
+          />
         ) : null}
 
         {stepIndex === 1 ? (
-          <div className="space-y-6">
-            <div>
-              <CardTitle className="font-tech tracking-[0.03em]">
-                Upload inspiration images
-              </CardTitle>
-              <CardDescription>
-                The current flow uses a lightweight vision placeholder to pull
-                style cues from filenames and metadata, giving you a clean place
-                to wire richer image analysis later.
-              </CardDescription>
-            </div>
-            <label className="block rounded-[1.75rem] border border-dashed border-[color:var(--border)] bg-[color:var(--surface-strong)] p-8 text-center">
-              <span className="text-lg font-semibold text-[color:var(--foreground)]">
-                Drop JPG, PNG, or WEBP inspiration images here
-              </span>
-              <span className="mt-2 block text-sm leading-6 text-[color:var(--muted)]">
-                Up to {MAX_INSPIRATION_IMAGES} files. Use filenames like
-                `warm-wood-modern-home.jpg` to make the mocked analysis feel
-                more intentional.
-              </span>
-              <input
-                aria-label="Upload inspiration images"
-                type="file"
-                accept={ALLOWED_IMAGE_TYPES.join(",")}
-                multiple
-                className="mt-6 block w-full cursor-pointer text-sm text-[color:var(--muted)]"
-                onChange={handleFileSelection}
-              />
-            </label>
-            {uploadError ? (
-              <p className="rounded-2xl bg-[rgba(211,139,66,0.16)] px-4 py-3 text-sm text-[color:var(--foreground)]">
-                {uploadError}
-              </p>
-            ) : null}
-            {analysisPending ? (
-              <p className="text-sm font-semibold text-[color:var(--accent)]">
-                Analyzing inspiration direction...
-              </p>
-            ) : null}
-            {styleAnalysis ? (
-              <div className="grid gap-4 rounded-[1.75rem] bg-[color:var(--surface-muted)] p-5 md:grid-cols-2">
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                    Extracted style
-                  </p>
-                  <p className="text-xl text-[color:var(--foreground)]">
-                    {styleAnalysis.aesthetic}
-                  </p>
-                  <p className="leading-7 text-[color:var(--muted)]">
-                    {styleAnalysis.summary}
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                    Palette and materials
-                  </p>
-                  <p className="text-[color:var(--foreground)]">
-                    {styleAnalysis.palette.join(", ")}
-                  </p>
-                  <p className="text-[color:var(--foreground)]">
-                    {styleAnalysis.materials.join(", ")}
-                  </p>
-                </div>
-              </div>
-            ) : null}
-          </div>
+          <StudioInspirationStep
+            analysisPending={analysisPending}
+            styleAnalysis={styleAnalysis}
+            uploadError={uploadError}
+            onFileSelection={handleFileSelection}
+          />
         ) : null}
 
         {stepIndex === 2 ? (
-          <div className="space-y-8">
-            <div>
-              <CardTitle className="font-tech tracking-[0.03em]">
-                Set climate and budget context
-              </CardTitle>
-              <CardDescription>
-                This drives the recommendation engine, score weighting, and
-                climate narrative on the results page.
-              </CardDescription>
-            </div>
-            <label className="block">
-              <span className="mb-3 block text-sm font-semibold text-[color:var(--foreground)]">
-                Location
-              </span>
-              <input
-                value={formState.location}
-                onChange={(event) => updateFormState("location", event.target.value)}
-                className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-4 py-3 text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]"
-                placeholder="Toronto, Canada"
-              />
-            </label>
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-[color:var(--foreground)]">
-                  Climate region
-                </p>
-                <div className="grid gap-3">
-                  {climateOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => updateFormState("climateRegion", option.value)}
-                      className={cn(
-                        "rounded-[1.5rem] border p-4 text-left transition",
-                        formState.climateRegion === option.value
-                          ? "border-[color:var(--accent)] bg-[color:var(--surface-strong)]"
-                          : "border-[color:var(--border)] bg-transparent hover:bg-[color:var(--surface-strong)]"
-                      )}
-                    >
-                      <p className="text-lg text-[color:var(--foreground)]">{option.label}</p>
-                      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                        {option.hint}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-[color:var(--foreground)]">
-                  Budget level
-                </p>
-                <div className="grid gap-3">
-                  {budgetOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => updateFormState("budgetLevel", option.value)}
-                      className={cn(
-                        "rounded-[1.5rem] border p-4 text-left transition",
-                        formState.budgetLevel === option.value
-                          ? "border-[color:var(--accent)] bg-[color:var(--surface-strong)]"
-                          : "border-[color:var(--border)] bg-transparent hover:bg-[color:var(--surface-strong)]"
-                      )}
-                    >
-                      <p className="text-lg text-[color:var(--foreground)]">{option.label}</p>
-                      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                        {option.hint}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <StudioContextStep
+            budgetLevel={formState.budgetLevel}
+            climateRegion={formState.climateRegion}
+            location={formState.location}
+            onBudgetLevelChange={(value) => updateFormState("budgetLevel", value)}
+            onClimateRegionChange={(value) => updateFormState("climateRegion", value)}
+            onLocationChange={(value) => updateFormState("location", value)}
+          />
         ) : null}
 
         {stepIndex === 3 ? (
-          <div className="space-y-6">
-            <div>
-              <CardTitle className="font-tech tracking-[0.03em]">
-                Review before generation
-              </CardTitle>
-              <CardDescription>
-                Submit the form to generate a concept package and route into the
-                results dashboard shell.
-              </CardDescription>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-[1.5rem] bg-[color:var(--surface-muted)] p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                  Brief
-                </p>
-                <p className="mt-3 leading-7 text-[color:var(--foreground)]">
-                  {reviewSummary.description || "No brief added yet."}
-                </p>
-              </div>
-              <div className="rounded-[1.5rem] bg-[color:var(--surface-muted)] p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                  Context
-                </p>
-                <div className="mt-3 space-y-2 text-[color:var(--foreground)]">
-                  <p>{reviewSummary.location}</p>
-                  <p>{reviewSummary.climateRegion}</p>
-                  <p>{reviewSummary.budgetLevel}</p>
-                  <p>{reviewSummary.inspirationCount} inspiration image(s)</p>
-                </div>
-              </div>
-            </div>
-            {styleAnalysis ? (
-              <div className="rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--surface-strong)] p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                  Inspiration analysis preview
-                </p>
-                <p className="mt-3 leading-7 text-[color:var(--foreground)]">
-                  {styleAnalysis.summary}
-                </p>
-              </div>
-            ) : null}
-          </div>
+          <StudioReviewStep styleAnalysis={styleAnalysis} summary={reviewSummary} />
         ) : null}
 
-        {formError ? (
-          <p
-            role="alert"
-            className="mt-6 rounded-2xl bg-[rgba(211,139,66,0.16)] px-4 py-3 text-sm text-[color:var(--foreground)]"
-          >
-            {formError}
-          </p>
-        ) : null}
+        {formError ? <StudioWizardAlert message={formError} /> : null}
       </Card>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
