@@ -885,7 +885,7 @@ function HomeScene({
         makeDefault
         enablePan
         enableZoom
-        target={[0, FLOOR_HEIGHT * 0.8, 0]}
+        target={[0, FLOOR_HEIGHT * 1.1, 0]}
         minDistance={10}
         maxDistance={42}
       />
@@ -925,7 +925,7 @@ export function Home3DPreview({
     [model3D.sustainabilityFeatures],
   );
 
-  const cameraDistance = Math.max(floorPlan.width, floorPlan.height) * 1.5;
+  const cameraDistance = Math.max(floorPlan.width, floorPlan.height) * 1.65;
 
   if (variant === "workspace") {
     return (
@@ -939,8 +939,8 @@ export function Home3DPreview({
           <Canvas
             shadows
             camera={{
-              position: [cameraDistance, FLOOR_HEIGHT * 1.4, cameraDistance],
-              fov: 36,
+              position: [cameraDistance, FLOOR_HEIGHT * 2.2, cameraDistance],
+              fov: 50,
             }}
           >
             <HomeScene floorPlan={floorPlan} model3D={model3D} />
@@ -950,15 +950,11 @@ export function Home3DPreview({
         <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex flex-col gap-3 sm:inset-x-5 sm:top-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="pointer-events-auto rounded-[1.25rem] border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.72)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.14)] backdrop-blur-xl">
             <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-              Generated 3D preview
+              Ecohome Presents
             </p>
             <h2 className="font-tech mt-1 text-2xl tracking-[0.03em] text-[color:var(--foreground)]">
               Your sustainable dream home
             </h2>
-            <p className="mt-1 text-sm text-[color:var(--muted)]">
-              {model3D.floors} floor{model3D.floors === 1 ? "" : "s"} ·{" "}
-              {model3D.roofType} roof · {model3D.exteriorColor}
-            </p>
           </div>
 
           <button
@@ -1021,27 +1017,32 @@ export function Home3DPreview({
 
         {showFloorPlan ? (
           <div
-            className="absolute inset-4 z-20 overflow-auto rounded-[1.5rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] p-4 shadow-[0_24px_80px_rgba(45,39,28,0.2)] backdrop-blur-xl sm:inset-5"
+            className="absolute left-6 right-6 top-6 z-20 flex max-h-[calc(100%-3rem)] flex-col overflow-hidden rounded-[1.5rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] shadow-[0_24px_80px_rgba(45,39,28,0.2)] backdrop-blur-xl"
             data-testid="floor-plan-overlay"
           >
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[color:var(--border)] px-6 py-5">
               <div>
-                <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
                   Floor plan
                 </p>
-                <p className="mt-1 text-sm text-[color:var(--foreground)]">
+                <p className="mt-1 text-base text-[color:var(--foreground)]">
                   Top-down room layout and openings
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowFloorPlan(false)}
-                className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:text-[color:var(--foreground)]"
+                className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
               >
                 Close
               </button>
             </div>
-            <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} compact />
+            <div className="overflow-auto px-8 py-6">
+              <FloorPlanDrawing
+                floorPlan={floorPlan}
+                model3D={model3D}
+              />
+            </div>
           </div>
         ) : null}
       </section>
@@ -1087,7 +1088,7 @@ export function Home3DPreview({
             shadows
             camera={{
               position: [cameraDistance, FLOOR_HEIGHT * 1.4, cameraDistance],
-              fov: 36,
+              fov: 32,
             }}
           >
             <HomeScene floorPlan={floorPlan} model3D={model3D} />
@@ -1095,27 +1096,30 @@ export function Home3DPreview({
 
           {showFloorPlan ? (
             <div
-              className="absolute inset-3 overflow-auto rounded-[1.25rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.18)] backdrop-blur-xl"
+              className="absolute left-1/2 top-3 z-20 flex w-[min(calc(100%-1.5rem),1240px)] -translate-x-1/2 flex-col overflow-hidden rounded-[1.25rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] px-5 py-4 shadow-[0_18px_55px_rgba(45,39,28,0.18)] backdrop-blur-xl sm:px-6 sm:py-5"
               data-testid="floor-plan-overlay"
             >
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
                     Floor plan
                   </p>
-                  <p className="mt-1 text-sm text-[color:var(--foreground)]">
+                  <p className="mt-1 text-base text-[color:var(--foreground)]">
                     Top-down room layout and openings
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowFloorPlan(false)}
-                  className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:text-[color:var(--foreground)]"
+                  className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
                 >
                   Close
                 </button>
               </div>
-              <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} compact />
+              <FloorPlanDrawing
+                floorPlan={floorPlan}
+                model3D={model3D}
+              />
             </div>
           ) : null}
         </div>

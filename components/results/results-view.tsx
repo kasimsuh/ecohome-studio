@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { budgetLabels, climateLabels } from "@/lib/domain/constants";
 import type { GeneratedHomeConcept } from "@/lib/domain/types";
 import { formatDate } from "@/lib/utils";
@@ -12,12 +14,12 @@ const scoreFields: Array<{
   { key: "climateResilience", label: "Climate resilience" },
   { key: "materialSustainability", label: "Material sustainability" },
   { key: "affordability", label: "Affordability" },
-  { key: "environmentalImpact", label: "Environmental impact" }
+  { key: "environmentalImpact", label: "Environmental impact" },
 ];
 
 function ReportSection({
   title,
-  children
+  children,
 }: {
   title: string;
   children: React.ReactNode;
@@ -39,7 +41,9 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
     <div>
       <div className="mb-2 flex items-center justify-between gap-4 text-sm">
         <span className="text-[color:var(--muted)]">{label}</span>
-        <span className="font-semibold text-[color:var(--foreground)]">{value}</span>
+        <span className="font-semibold text-[color:var(--foreground)]">
+          {value}
+        </span>
       </div>
       <div className="h-2 rounded-full bg-[rgba(31,107,82,0.09)]">
         <div
@@ -55,6 +59,17 @@ function ReportRail({ project }: { project: GeneratedHomeConcept }) {
   return (
     <aside className="bg-[linear-gradient(180deg,rgba(255,250,242,0.78),rgba(232,221,202,0.66))] backdrop-blur-2xl lg:h-screen lg:overflow-y-auto lg:border-r lg:border-[rgba(61,93,72,0.16)]">
       <div className="mx-auto w-full max-w-[46rem] px-5 py-6 lg:max-w-none lg:px-6 lg:py-7">
+        <div className="mb-7">
+          <Link href="/" className="block">
+            <p className="font-tech text-lg font-semibold uppercase tracking-[0.2em] text-[color:var(--accent)]">
+              EcoHome Studio
+            </p>
+            <p className="mt-1 text-sm text-[color:var(--muted)]">
+              Sustainable home concept lab
+            </p>
+          </Link>
+        </div>
+
         <div className="mb-6 flex flex-wrap gap-2 text-xs font-semibold text-[color:var(--muted)]">
           <span className="rounded-full bg-[color:var(--accent-soft)] px-3 py-1.5">
             {climateLabels[project.climateRegion]}
@@ -181,8 +196,11 @@ function ReportRail({ project }: { project: GeneratedHomeConcept }) {
             {[
               ["Energy reduction", project.environmentalImpact.energyReduction],
               ["Water reduction", project.environmentalImpact.waterReduction],
-              ["Embodied carbon", project.environmentalImpact.embodiedCarbonReduction],
-              ["Resilience gain", project.environmentalImpact.resilienceGain]
+              [
+                "Embodied carbon",
+                project.environmentalImpact.embodiedCarbonReduction,
+              ],
+              ["Resilience gain", project.environmentalImpact.resilienceGain],
             ].map(([label, value]) => (
               <div
                 key={label}
@@ -219,12 +237,23 @@ function ReportRail({ project }: { project: GeneratedHomeConcept }) {
                 <p className="font-tech text-xs uppercase tracking-[0.16em] text-[color:var(--muted)]">
                   {prompt.label}
                 </p>
-                <p className="mt-2 text-[color:var(--foreground)]">{prompt.prompt}</p>
+                <p className="mt-2 text-[color:var(--foreground)]">
+                  {prompt.prompt}
+                </p>
                 <p className="mt-1 text-sm">{prompt.note}</p>
               </article>
             ))}
           </div>
         </ReportSection>
+
+        <div className="border-t border-[rgba(61,93,72,0.16)] pt-6">
+          <Link
+            href="/"
+            className="flex w-full items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-4 py-3 text-sm font-semibold text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
+          >
+            Return to dashboard
+          </Link>
+        </div>
       </div>
     </aside>
   );
