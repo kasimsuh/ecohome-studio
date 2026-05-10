@@ -23,10 +23,14 @@ describe("ResultsView", () => {
     expect(
       screen.getByRole("heading", { name: sampleGeneratedHomeConcept.heroTitle })
     ).toBeInTheDocument();
+    expect(screen.getByText("EcoHome Studio")).toBeInTheDocument();
+    expect(screen.queryByText("Back to dashboard")).not.toBeInTheDocument();
     expect(screen.getByText("Sustainability Upgrades")).toBeInTheDocument();
     expect(screen.getByText("Environmental Impact")).toBeInTheDocument();
     expect(screen.getByText("Visual Prompt Starters")).toBeInTheDocument();
-    expect(screen.getByText("Generated 3D preview")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Your sustainable dream home" })
+    ).toBeInTheDocument();
     expect(screen.getByTestId("home-3d-canvas")).toBeInTheDocument();
 
     expect(screen.queryByTestId("floor-plan-overlay")).not.toBeInTheDocument();

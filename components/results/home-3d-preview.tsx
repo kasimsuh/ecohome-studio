@@ -3,7 +3,12 @@
 import { useMemo, useState } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import {
+  OrbitControls,
+  Sky,
+  Environment,
+  ContactShadows,
+} from "@react-three/drei";
 
 import { FloorPlanDrawing } from "@/components/results/floor-plan-2d";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -150,19 +155,35 @@ function Window({
         <boxGeometry args={[frameT, h, frameDepth]} />
         <meshStandardMaterial color="#3d3a32" roughness={0.7} />
       </mesh>
+      {/* Glass pane – physical transmission for real glass look */}
       <mesh>
         <boxGeometry args={[w, h, 0.04]} />
-        <meshStandardMaterial
-          color="#bcdfd2"
-          transparent
-          opacity={0.7}
-          metalness={0.55}
-          roughness={0.12}
+        <meshPhysicalMaterial
+          color="#c8e8e4"
+          transmission={0.84}
+          roughness={0.04}
+          metalness={0}
+          ior={1.5}
+          thickness={0.06}
         />
       </mesh>
-      <mesh>
-        <boxGeometry args={[w, frameT * 0.55, 0.06]} />
-        <meshStandardMaterial color="#3d3a32" />
+      {/* Horizontal mid-rail divider */}
+      <mesh position={[0, 0, 0.025]}>
+        <boxGeometry args={[w, frameT * 0.5, 0.03]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+      </mesh>
+      {/* Vertical mid-post divider */}
+      <mesh position={[0, 0, 0.025]}>
+        <boxGeometry args={[frameT * 0.5, h, 0.03]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.7} />
+      </mesh>
+      {/* Exterior sill – protruding shelf below the frame */}
+      <mesh
+        position={[0, -h / 2 - frameT * 0.6, frameDepth / 2 + 0.06]}
+        castShadow
+      >
+        <boxGeometry args={[w + frameT * 2 + 0.12, 0.06, 0.15]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.75} />
       </mesh>
     </group>
   );
@@ -456,6 +477,15 @@ function GableRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
         <boxGeometry args={[w + 0.06, 0.1, 0.2]} />
         <meshStandardMaterial color="#2f2c25" />
       </mesh>
+      {/* Eave fascia boards – south and north edges */}
+      <mesh position={[0, 0.09, d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, 0.2, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+      <mesh position={[0, 0.09, -d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, 0.2, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
     </group>
   );
 }
@@ -496,13 +526,32 @@ function HipRoof({ floorPlan, top }: { floorPlan: FloorPlan; top: number }) {
   }, [w, d, peak]);
 
   return (
-    <mesh position={[0, top, 0]} geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial
-        color="#4a4339"
-        side={THREE.DoubleSide}
-        roughness={0.92}
-      />
-    </mesh>
+    <group position={[0, top, 0]}>
+      <mesh geometry={geometry} castShadow receiveShadow>
+        <meshStandardMaterial
+          color="#4a4339"
+          side={THREE.DoubleSide}
+          roughness={0.92}
+        />
+      </mesh>
+      {/* Eave fascia – all 4 edges */}
+      <mesh position={[0, 0.05, d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, 0.18, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+      <mesh position={[0, 0.05, -d / 2]} castShadow>
+        <boxGeometry args={[w + 0.06, 0.18, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+      <mesh position={[w / 2, 0.05, 0]} castShadow>
+        <boxGeometry args={[0.09, 0.18, d]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+      <mesh position={[-w / 2, 0.05, 0]} castShadow>
+        <boxGeometry args={[0.09, 0.18, d]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.82} />
+      </mesh>
+    </group>
   );
 }
 
@@ -790,29 +839,49 @@ function Trees({ floorPlan }: { floorPlan: FloorPlan }) {
 
   return (
     <>
-      {positions.map(([x, z, scale, hue], i) => (
-        <group
-          key={`tree-${i}`}
-          position={[x, 0, z]}
-          scale={[scale, scale, scale]}
-        >
-          <mesh position={[0, 0.45, 0]} castShadow>
-            <cylinderGeometry args={[0.08, 0.12, 0.9, 12]} />
-            <meshStandardMaterial color="#6a5236" roughness={0.95} />
-          </mesh>
-          <mesh position={[0, 1.15, 0]} castShadow>
-            <sphereGeometry args={[0.5, 16, 16]} />
-            <meshStandardMaterial
-              color={hue > 1 ? "#5b8a4d" : "#6e9a58"}
-              roughness={0.92}
-            />
-          </mesh>
-          <mesh position={[0.18, 1.4, 0.12]} castShadow>
-            <sphereGeometry args={[0.32, 14, 14]} />
-            <meshStandardMaterial color="#79a861" roughness={0.92} />
-          </mesh>
-        </group>
-      ))}
+      {positions.map(([x, z, scale, hue], i) => {
+        const dark = hue > 1 ? "#4a7a40" : "#5b8a4d";
+        const mid = hue > 1 ? "#5b8a4d" : "#6e9a58";
+        const light = "#79a861";
+        return (
+          <group
+            key={`tree-${i}`}
+            position={[x, 0, z]}
+            scale={[scale, scale, scale]}
+          >
+            {/* Tapered trunk – two stacked cylinders */}
+            <mesh position={[0, 0.3, 0]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.09, 0.14, 0.6, 10]} />
+              <meshStandardMaterial color="#6a5236" roughness={0.97} />
+            </mesh>
+            <mesh position={[0, 0.72, 0]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.06, 0.09, 0.48, 10]} />
+              <meshStandardMaterial color="#7a6040" roughness={0.97} />
+            </mesh>
+            {/* Canopy – 5 overlapping spheres for organic silhouette */}
+            <mesh position={[0, 1.15, 0]} castShadow receiveShadow>
+              <sphereGeometry args={[0.52, 14, 14]} />
+              <meshStandardMaterial color={dark} roughness={0.93} />
+            </mesh>
+            <mesh position={[-0.28, 1.38, 0.18]} castShadow>
+              <sphereGeometry args={[0.38, 12, 12]} />
+              <meshStandardMaterial color={mid} roughness={0.92} />
+            </mesh>
+            <mesh position={[0.3, 1.45, -0.15]} castShadow>
+              <sphereGeometry args={[0.36, 12, 12]} />
+              <meshStandardMaterial color={mid} roughness={0.92} />
+            </mesh>
+            <mesh position={[0.1, 1.72, 0.08]} castShadow>
+              <sphereGeometry args={[0.3, 12, 12]} />
+              <meshStandardMaterial color={light} roughness={0.91} />
+            </mesh>
+            <mesh position={[-0.12, 1.9, -0.1]} castShadow>
+              <sphereGeometry args={[0.22, 10, 10]} />
+              <meshStandardMaterial color={light} roughness={0.9} />
+            </mesh>
+          </group>
+        );
+      })}
     </>
   );
 }
@@ -832,6 +901,54 @@ function Ground({ floorPlan }: { floorPlan: FloorPlan }) {
   );
 }
 
+function EntryCanopy({
+  floorPlan,
+  model3D,
+}: {
+  floorPlan: FloorPlan;
+  model3D: Model3D;
+}) {
+  const door = model3D.doors.find((d) => d.wall === "south" && d.floor === 0);
+  if (!door) return null;
+
+  const doorX = door.offset * floorPlan.width - floorPlan.width / 2;
+  const canopyY = FOUNDATION_HEIGHT + door.height + 0.04;
+  const canopyW = door.width + 0.9;
+  const canopyProtrude = 0.7;
+  const slabT = 0.09;
+  const postH = door.height + 0.04;
+
+  return (
+    <group position={[doorX, canopyY, floorPlan.height / 2]}>
+      {/* Canopy slab */}
+      <mesh
+        castShadow
+        receiveShadow
+        position={[0, slabT / 2, canopyProtrude / 2]}
+      >
+        <boxGeometry args={[canopyW, slabT, canopyProtrude]} />
+        <meshStandardMaterial color="#3d3a32" roughness={0.78} />
+      </mesh>
+      {/* Left support post */}
+      <mesh
+        castShadow
+        position={[-(canopyW / 2 - 0.07), -postH / 2, canopyProtrude - 0.05]}
+      >
+        <boxGeometry args={[0.09, postH, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.85} />
+      </mesh>
+      {/* Right support post */}
+      <mesh
+        castShadow
+        position={[canopyW / 2 - 0.07, -postH / 2, canopyProtrude - 0.05]}
+      >
+        <boxGeometry args={[0.09, postH, 0.09]} />
+        <meshStandardMaterial color="#2f2c25" roughness={0.85} />
+      </mesh>
+    </group>
+  );
+}
+
 function HomeScene({
   floorPlan,
   model3D,
@@ -843,21 +960,39 @@ function HomeScene({
 
   return (
     <>
-      <ambientLight intensity={0.4} />
+      <Sky
+        sunPosition={[50, 20, 30]}
+        turbidity={5}
+        rayleigh={0.5}
+        mieCoefficient={0.005}
+        mieDirectionalG={0.8}
+      />
+      <Environment preset="sunset" />
+      <ambientLight intensity={0.22} />
       <directionalLight
         position={[12, 16, 9]}
-        intensity={1.5}
+        intensity={1.2}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-bias={-0.001}
+        shadow-camera-near={0.5}
+        shadow-camera-far={60}
         shadow-camera-left={-30}
         shadow-camera-right={30}
         shadow-camera-top={30}
         shadow-camera-bottom={-30}
       />
-      <directionalLight position={[-10, 8, -6]} intensity={0.45} />
+      <directionalLight position={[-10, 8, -6]} intensity={0.3} />
 
       <Ground floorPlan={floorPlan} />
+      <ContactShadows
+        position={[0, 0.02, 0]}
+        opacity={0.32}
+        scale={50}
+        blur={2.8}
+        far={12}
+      />
       <Foundation floorPlan={floorPlan} />
       <WallsWithOpenings floorPlan={floorPlan} model3D={model3D} />
       <Roof floorPlan={floorPlan} model3D={model3D} />
@@ -868,6 +1003,7 @@ function HomeScene({
       {model3D.doors.map((d, i) => (
         <Door key={`door-${i}`} opening={d} floorPlan={floorPlan} />
       ))}
+      <EntryCanopy floorPlan={floorPlan} model3D={model3D} />
 
       {features.solarPanels ? (
         <SolarArray floorPlan={floorPlan} model3D={model3D} />
@@ -885,11 +1021,78 @@ function HomeScene({
         makeDefault
         enablePan
         enableZoom
-        target={[0, FLOOR_HEIGHT * 0.8, 0]}
+        target={[0, FLOOR_HEIGHT * 1.1, 0]}
         minDistance={10}
         maxDistance={42}
       />
     </>
+  );
+}
+
+const featureDescriptions: Record<
+  keyof Model3D["sustainabilityFeatures"],
+  { headline: string; body: string }
+> = {
+  solarPanels: {
+    headline: "Solar array",
+    body: "Photovoltaic panels are integrated across your roof, converting sunlight directly into electricity. This cuts your energy bills, reduces dependence on the grid, and lowers your home's lifetime carbon footprint — often producing more energy than the home consumes.",
+  },
+  greenRoof: {
+    headline: "Living green roof",
+    body: "A planted roof layer of drought-tolerant sedums and grasses acts as natural insulation, slowing heat gain in summer and heat loss in winter. It also absorbs stormwater, supports local biodiversity, and extends the lifespan of the roof membrane beneath.",
+  },
+  rainwaterTank: {
+    headline: "Rainwater harvesting",
+    body: "A dedicated tank captures roof runoff and stores it for garden irrigation, toilet flushing, and laundry. This can cut mains water use by up to 40%, building household resilience during dry periods and reducing pressure on local stormwater systems.",
+  },
+  trees: {
+    headline: "Native canopy",
+    body: "Carefully placed native trees provide summer shading that passively cools the home and outdoor spaces, while shelter from prevailing winds reduces heating demand in winter. Over their lifetime they sequester carbon and create habitat for local wildlife.",
+  },
+  permeableDriveway: {
+    headline: "Permeable driveway",
+    body: "A permeable paving system lets rainwater filter naturally through joints and into the soil below, rather than rushing into stormwater drains. This reduces local flood risk, recharges groundwater, and keeps the site cool by avoiding the heat-island effect of sealed surfaces.",
+  },
+  crossVentilation: {
+    headline: "Cross ventilation",
+    body: "Strategically placed openings on opposite walls channel prevailing breezes through the home, flushing out heat and moisture without any mechanical system. This passive cooling strategy is one of the most effective ways to keep a home comfortable year-round at zero running cost.",
+  },
+};
+
+function FeaturePopup({
+  featureKey,
+  color,
+  onClose,
+}: {
+  featureKey: keyof Model3D["sustainabilityFeatures"];
+  color: string;
+  onClose: () => void;
+}) {
+  const info = featureDescriptions[featureKey];
+  return (
+    <div className="rounded-[1.25rem] border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.96)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.18)] backdrop-blur-xl">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span
+            className="mt-0.5 inline-block h-3 w-3 shrink-0 rounded-full"
+            style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }}
+            aria-hidden
+          />
+          <p className="font-tech text-sm font-semibold uppercase tracking-[0.14em] text-[color:var(--foreground)]">
+            {info.headline}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-2.5 py-1 text-xs font-semibold text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <p className="text-sm leading-6 text-[color:var(--muted)]">{info.body}</p>
+    </div>
   );
 }
 
@@ -909,6 +1112,13 @@ export function Home3DPreview({
   variant?: "card" | "workspace";
 }) {
   const [showFloorPlan, setShowFloorPlan] = useState(false);
+  const [selectedFeature, setSelectedFeature] = useState<
+    keyof Model3D["sustainabilityFeatures"] | null
+  >(null);
+
+  function toggleFeature(key: keyof Model3D["sustainabilityFeatures"]) {
+    setSelectedFeature((prev) => (prev === key ? null : key));
+  }
   const activeFeatures = useMemo(
     () =>
       (
@@ -925,7 +1135,7 @@ export function Home3DPreview({
     [model3D.sustainabilityFeatures],
   );
 
-  const cameraDistance = Math.max(floorPlan.width, floorPlan.height) * 1.5;
+  const cameraDistance = Math.max(floorPlan.width, floorPlan.height) * 1.65;
 
   if (variant === "workspace") {
     return (
@@ -939,8 +1149,8 @@ export function Home3DPreview({
           <Canvas
             shadows
             camera={{
-              position: [cameraDistance, FLOOR_HEIGHT * 1.4, cameraDistance],
-              fov: 36,
+              position: [cameraDistance, FLOOR_HEIGHT * 2.2, cameraDistance],
+              fov: 50,
             }}
           >
             <HomeScene floorPlan={floorPlan} model3D={model3D} />
@@ -950,15 +1160,11 @@ export function Home3DPreview({
         <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex flex-col gap-3 sm:inset-x-5 sm:top-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="pointer-events-auto rounded-[1.25rem] border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.72)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.14)] backdrop-blur-xl">
             <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-              Generated 3D preview
+              Ecohome Presents
             </p>
             <h2 className="font-tech mt-1 text-2xl tracking-[0.03em] text-[color:var(--foreground)]">
               Your sustainable dream home
             </h2>
-            <p className="mt-1 text-sm text-[color:var(--muted)]">
-              {model3D.floors} floor{model3D.floors === 1 ? "" : "s"} ·{" "}
-              {model3D.roofType} roof · {model3D.exteriorColor}
-            </p>
           </div>
 
           <button
@@ -972,76 +1178,100 @@ export function Home3DPreview({
         </div>
 
         <div className="pointer-events-none absolute inset-x-4 bottom-4 z-10 grid gap-3 sm:inset-x-5 sm:bottom-5 xl:grid-cols-[1fr_1fr]">
+          {/* Left col – sustainability badges */}
           <div className="pointer-events-auto rounded-[1.25rem] border border-[rgba(61,93,72,0.16)] bg-[rgba(255,250,242,0.7)] p-3 shadow-[0_18px_55px_rgba(45,39,28,0.12)] backdrop-blur-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-              Sustainability layer
+              Sustainability layer · tap to learn more
             </p>
             <ul className="mt-2 flex flex-wrap gap-2">
               {activeFeatures.map((feature) => (
-                <li
-                  key={feature.key}
-                  className="flex items-center gap-2 rounded-full bg-[rgba(255,248,239,0.88)] px-3 py-1.5 text-xs"
-                >
-                  <span
-                    className="inline-block h-3 w-3 rounded-full"
-                    style={{
-                      backgroundColor: feature.color,
-                      boxShadow: `0 0 8px ${feature.color}`,
-                    }}
-                    aria-hidden
-                  />
-                  <span className="font-semibold text-[color:var(--foreground)]">
+                <li key={feature.key}>
+                  <button
+                    type="button"
+                    onClick={() => toggleFeature(feature.key)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold transition",
+                      selectedFeature === feature.key
+                        ? "bg-[color:var(--accent)] text-white"
+                        : "bg-[rgba(255,248,239,0.88)] text-[color:var(--foreground)] hover:bg-[rgba(255,248,239,1)]",
+                    )}
+                  >
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{
+                        backgroundColor:
+                          selectedFeature === feature.key
+                            ? "rgba(255,255,255,0.7)"
+                            : feature.color,
+                        boxShadow:
+                          selectedFeature === feature.key
+                            ? "none"
+                            : `0 0 8px ${feature.color}`,
+                      }}
+                      aria-hidden
+                    />
                     {feature.label}
-                  </span>
+                  </button>
                 </li>
               ))}
             </ul>
           </div>
 
-          {upgrades?.length ? (
-            <div className="pointer-events-auto hidden rounded-[1.25rem] border border-[rgba(61,93,72,0.16)] bg-[rgba(255,250,242,0.7)] p-3 shadow-[0_18px_55px_rgba(45,39,28,0.12)] backdrop-blur-xl xl:block">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-                Top upgrades
-              </p>
-              <div className="mt-2 grid gap-2">
-                {upgrades.slice(0, 2).map((upgrade) => (
-                  <div key={upgrade.title}>
-                    <p className="text-sm font-semibold text-[color:var(--foreground)]">
-                      {upgrade.title}
-                    </p>
-                    <p className="text-xs text-[color:var(--muted)]">
-                      {upgrade.category} · {upgrade.impactLevel} impact
-                    </p>
-                  </div>
-                ))}
+          {/* Right col – feature popup when open, top upgrades when closed */}
+          <div className="pointer-events-auto hidden xl:flex xl:flex-col">
+            {selectedFeature ? (
+              <FeaturePopup
+                featureKey={selectedFeature}
+                color={sustainabilityAccent[selectedFeature]}
+                onClose={() => setSelectedFeature(null)}
+              />
+            ) : upgrades?.length ? (
+              <div className="flex h-full flex-col rounded-[1.25rem] border border-[rgba(61,93,72,0.16)] bg-[rgba(255,250,242,0.7)] p-3 shadow-[0_18px_55px_rgba(45,39,28,0.12)] backdrop-blur-xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  Top upgrades
+                </p>
+                <div className="mt-2 grid gap-2">
+                  {upgrades.slice(0, 2).map((upgrade) => (
+                    <div key={upgrade.title}>
+                      <p className="text-sm font-semibold text-[color:var(--foreground)]">
+                        {upgrade.title}
+                      </p>
+                      <p className="text-xs text-[color:var(--muted)]">
+                        {upgrade.category} · {upgrade.impactLevel} impact
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
 
         {showFloorPlan ? (
           <div
-            className="absolute inset-4 z-20 overflow-auto rounded-[1.5rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] p-4 shadow-[0_24px_80px_rgba(45,39,28,0.2)] backdrop-blur-xl sm:inset-5"
+            className="absolute left-6 right-6 top-6 z-20 flex max-h-[calc(100%-3rem)] flex-col overflow-hidden rounded-[1.5rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] shadow-[0_24px_80px_rgba(45,39,28,0.2)] backdrop-blur-xl"
             data-testid="floor-plan-overlay"
           >
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[color:var(--border)] px-6 py-5">
               <div>
-                <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
                   Floor plan
                 </p>
-                <p className="mt-1 text-sm text-[color:var(--foreground)]">
+                <p className="mt-1 text-base text-[color:var(--foreground)]">
                   Top-down room layout and openings
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowFloorPlan(false)}
-                className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:text-[color:var(--foreground)]"
+                className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
               >
                 Close
               </button>
             </div>
-            <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} compact />
+            <div className="overflow-auto px-8 py-6">
+              <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} />
+            </div>
           </div>
         ) : null}
       </section>
@@ -1087,7 +1317,7 @@ export function Home3DPreview({
             shadows
             camera={{
               position: [cameraDistance, FLOOR_HEIGHT * 1.4, cameraDistance],
-              fov: 36,
+              fov: 32,
             }}
           >
             <HomeScene floorPlan={floorPlan} model3D={model3D} />
@@ -1095,27 +1325,27 @@ export function Home3DPreview({
 
           {showFloorPlan ? (
             <div
-              className="absolute inset-3 overflow-auto rounded-[1.25rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.18)] backdrop-blur-xl"
+              className="absolute left-1/2 top-3 z-20 flex w-[min(calc(100%-1.5rem),1240px)] -translate-x-1/2 flex-col overflow-hidden rounded-[1.25rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] px-5 py-4 shadow-[0_18px_55px_rgba(45,39,28,0.18)] backdrop-blur-xl sm:px-6 sm:py-5"
               data-testid="floor-plan-overlay"
             >
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  <p className="font-tech text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
                     Floor plan
                   </p>
-                  <p className="mt-1 text-sm text-[color:var(--foreground)]">
+                  <p className="mt-1 text-base text-[color:var(--foreground)]">
                     Top-down room layout and openings
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowFloorPlan(false)}
-                  className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:text-[color:var(--foreground)]"
+                  className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs font-semibold text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
                 >
                   Close
                 </button>
               </div>
-              <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} compact />
+              <FloorPlanDrawing floorPlan={floorPlan} model3D={model3D} />
             </div>
           ) : null}
         </div>
@@ -1123,28 +1353,49 @@ export function Home3DPreview({
         <aside className="grid gap-4 xl:grid-cols-[1fr_1fr]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-              Sustainability layer
+              Sustainability layer · tap to learn more
             </p>
             <ul className="mt-3 flex flex-wrap gap-2">
               {activeFeatures.map((feature) => (
-                <li
-                  key={feature.key}
-                  className="flex items-center gap-2 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-1.5 text-xs"
-                >
-                  <span
-                    className="inline-block h-3 w-3 rounded-full"
-                    style={{
-                      backgroundColor: feature.color,
-                      boxShadow: `0 0 8px ${feature.color}`,
-                    }}
-                    aria-hidden
-                  />
-                  <span className="font-semibold text-[color:var(--foreground)]">
+                <li key={feature.key}>
+                  <button
+                    type="button"
+                    onClick={() => toggleFeature(feature.key)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                      selectedFeature === feature.key
+                        ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-white"
+                        : "border-[color:var(--border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)] hover:border-[color:var(--accent)]",
+                    )}
+                  >
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{
+                        backgroundColor:
+                          selectedFeature === feature.key
+                            ? "rgba(255,255,255,0.7)"
+                            : feature.color,
+                        boxShadow:
+                          selectedFeature === feature.key
+                            ? "none"
+                            : `0 0 8px ${feature.color}`,
+                      }}
+                      aria-hidden
+                    />
                     {feature.label}
-                  </span>
+                  </button>
                 </li>
               ))}
             </ul>
+            {selectedFeature ? (
+              <div className="mt-3">
+                <FeaturePopup
+                  featureKey={selectedFeature}
+                  color={sustainabilityAccent[selectedFeature]}
+                  onClose={() => setSelectedFeature(null)}
+                />
+              </div>
+            ) : null}
           </div>
 
           {upgrades?.length ? (

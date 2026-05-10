@@ -323,17 +323,17 @@ function FloorSvg({
   const isGround = floor === 0;
 
   return (
-    <div className="flex min-w-fit flex-col items-center">
-      <p className="font-tech mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+    <div className="flex w-full max-w-[560px] flex-col items-center rounded-[1.25rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.94)] p-5 shadow-[0_18px_45px_rgba(68,56,38,0.12)]">
+      <p className="font-tech mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
         {floorLabel(floor)}
       </p>
       <svg
         viewBox={`0 0 ${svgW} ${svgH}`}
-        width={Math.min(svgW, 480)}
-        height="auto"
+        width="100%"
         role="img"
         aria-label={`${floorLabel(floor)} plan`}
-        style={{ maxWidth: "100%" }}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ height: "auto" }}
       >
         <rect
           x={0}
@@ -439,12 +439,10 @@ function FloorSvg({
 
 export function FloorPlanDrawing({
   floorPlan,
-  model3D,
-  compact = false
+  model3D
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
-  compact?: boolean;
 }) {
   const floors = useMemo(() => {
     const set = new Set<number>();
@@ -458,13 +456,9 @@ export function FloorPlanDrawing({
   );
 
   return (
-    <>
+    <div className="mx-auto flex w-full max-w-[1180px] flex-col">
       <div
-        className={
-          compact
-            ? "flex flex-wrap items-start justify-center gap-4 overflow-x-auto pb-2"
-            : "flex flex-wrap items-start justify-center gap-8 overflow-x-auto pb-2"
-        }
+        className="grid grid-cols-2 items-start gap-10"
       >
         {floors.map((floor) => (
           <FloorSvg
@@ -476,38 +470,34 @@ export function FloorPlanDrawing({
         ))}
       </div>
 
-      <div
-        className={
-          compact
-            ? "mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[color:var(--border)] pt-4"
-            : "mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[color:var(--border)] pt-5"
-        }
-      >
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+      <div className="mt-3 grid gap-2 border-t border-[color:var(--border)] pt-3">
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
           Room zones
         </p>
-        {(Object.keys(roomColors) as FloorPlanRoomType[]).map((type) => (
-          <div key={type} className="flex items-center gap-2 text-sm">
+        <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
+          {(Object.keys(roomColors) as FloorPlanRoomType[]).map((type) => (
+            <div key={type} className="flex items-center gap-3 text-base">
+              <span
+                className="inline-block h-4 w-7 shrink-0 rounded-sm border border-[color:var(--border)]"
+                style={{ backgroundColor: roomColors[type] }}
+                aria-hidden
+              />
+              <span className="text-[color:var(--muted)]">
+                {roomTypeLabels[type]}
+              </span>
+            </div>
+          ))}
+          <div className="flex items-center gap-3 text-sm text-[color:var(--muted)]">
             <span
-              className="inline-block h-3 w-5 rounded-sm border border-[color:var(--border)]"
-              style={{ backgroundColor: roomColors[type] }}
+              className="inline-block h-3 w-7 shrink-0 rounded-full"
+              style={{ backgroundColor: sustainabilityAccent }}
               aria-hidden
             />
-            <span className="text-[color:var(--muted)]">
-              {roomTypeLabels[type]}
-            </span>
+            {hasSouthGlazing ? "South-facing solar window" : "Window strategy"}
           </div>
-        ))}
-        <span className="ml-auto flex items-center gap-2 text-xs text-[color:var(--muted)]">
-          <span
-            className="inline-block h-2 w-5 rounded-full"
-            style={{ backgroundColor: sustainabilityAccent }}
-            aria-hidden
-          />
-          {hasSouthGlazing ? "South-facing solar window" : "Window strategy"}
-        </span>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
