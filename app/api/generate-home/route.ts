@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { generateStructuredHomeConceptWithFeatherless } from "@/lib/ai/featherless";
+import { buildGenerateHomeResponseHeaders } from "@/lib/api/generate-home-response";
 import { generateHomeRequestSchema } from "@/lib/domain/home-concept-schema";
 import { createFallbackStructuredHomeConcept } from "@/lib/domain/structured-home-fallback";
 import { retrieveSustainabilityContext } from "@/lib/rag/retriever";
-
-function compactHeaderValue(value: string, maxLength = 180) {
-  const normalized = value.replace(/\s+/g, " ").trim();
-
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
-}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -98,6 +89,11 @@ export async function POST(request: Request) {
             }
           : {}),
       }
+      headers: buildGenerateHomeResponseHeaders({
+        provider: "featherless",
+        guidanceSource: guidance.source,
+        diagnostics: guidance.diagnostics
+      })
     });
   } catch (error) {
     const fallback = createFallbackStructuredHomeConcept({
@@ -158,6 +154,12 @@ export async function POST(request: Request) {
             }
           : {}),
       }
+      headers: buildGenerateHomeResponseHeaders({
+        provider: "fallback",
+        guidanceSource: guidance.source,
+        diagnostics: guidance.diagnostics,
+        providerError: getErrorMessage(error)
+      })
     });
   }
 }
