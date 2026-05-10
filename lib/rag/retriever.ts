@@ -7,19 +7,27 @@ import type {
 import { createEmbeddingModel } from "@/lib/rag/embeddings";
 import { retrieveLocalGuidance } from "@/lib/rag/local-knowledge";
 import { getSupabaseVectorStoreConfig } from "@/lib/rag/supabase";
+import {
+  isWatsonxVectorIndexConfigured,
+  retrieveWatsonxGuidance,
+} from "@/lib/rag/watsonx";
 
 export interface RetrievedSustainabilityContext {
   snippets: GuidanceSnippet[];
   contextText: string;
-  source: "supabase-pgvector" | "local-seed-docs" | "none";
+  source: "supabase-pgvector" | "watsonx-vector-index" | "local-seed-docs" | "none";
   diagnostics: {
     query: string;
     requestedLimit: number;
     supabaseAttempted: boolean;
     supabaseMatchCount: number;
+    watsonxAttempted: boolean;
+    watsonxMatchCount: number;
+    watsonxUsed: boolean;
     localFallbackUsed: boolean;
-    localFallbackReason?: string;
+    fallbackReason?: string;
     supabaseError?: string;
+    watsonxError?: string;
     localFallbackError?: string;
   };
 }
@@ -93,6 +101,14 @@ function dedupeSnippets(snippets: GuidanceSnippet[], limit: number) {
     seen.add(key);
     return true;
   });
+}
+
+function combineFallbackReasons(...reasons: Array<string | undefined>) {
+  const normalized = reasons
+    .map((reason) => reason?.trim())
+    .filter((reason): reason is string => Boolean(reason));
+
+  return Array.from(new Set(normalized)).join(",");
 }
 
 export function buildSustainabilityRetrievalQuery(input: GenerateHomeRequest) {
@@ -243,6 +259,87 @@ async function retrieveLocalFallback(
   }
 }
 
+async function retrieveWatsonxOrLocalFallback(
+  input: GenerateHomeRequest,
+  query: string,
+  limit: number,
+  diagnostics: RetrievedSustainabilityContext["diagnostics"],
+  fallbackReason: string,
+): Promise<RetrievedSustainabilityContext> {
+  if (!isWatsonxVectorIndexConfigured()) {
+    return retrieveLocalFallback(input, limit, {
+      ...diagnostics,
+      fallbackReason: combineFallbackReasons(
+        fallbackReason,
+        "watsonx-not-configured",
+      ),
+    });
+  }
+
+  try {
+    const watsonxResult = await retrieveWatsonxGuidance(query, limit);
+    const watsonxDiagnostics = {
+      ...diagnostics,
+      watsonxAttempted: true,
+      watsonxMatchCount: watsonxResult.matchCount,
+      watsonxUsed: watsonxResult.snippets.length > 0,
+      fallbackReason,
+    };
+
+    if (!watsonxResult.snippets.length) {
+      return retrieveLocalFallback(input, limit, {
+        ...watsonxDiagnostics,
+        fallbackReason: combineFallbackReasons(
+          fallbackReason,
+          "watsonx-returned-no-matches",
+        ),
+      });
+    }
+
+    if (watsonxResult.snippets.length < minimumRetrievedSnippetCount) {
+      const localResult = await retrieveLocalFallback(input, limit, {
+        ...watsonxDiagnostics,
+        fallbackReason: combineFallbackReasons(
+          fallbackReason,
+          "watsonx-results-padded-with-local-seed-docs",
+        ),
+      });
+      const snippets = dedupeSnippets(
+        [...watsonxResult.snippets, ...localResult.snippets],
+        limit,
+      );
+
+      return {
+        snippets,
+        contextText: formatRetrievedContext(snippets),
+        source: "watsonx-vector-index",
+        diagnostics: {
+          ...localResult.diagnostics,
+          watsonxUsed: true,
+          watsonxMatchCount: watsonxResult.matchCount,
+        },
+      };
+    }
+
+    return {
+      snippets: watsonxResult.snippets,
+      contextText: formatRetrievedContext(watsonxResult.snippets),
+      source: "watsonx-vector-index",
+      diagnostics: watsonxDiagnostics,
+    };
+  } catch (error) {
+    return retrieveLocalFallback(input, limit, {
+      ...diagnostics,
+      watsonxAttempted: true,
+      watsonxError: getErrorMessage(error),
+      fallbackReason: combineFallbackReasons(
+        fallbackReason,
+        "watsonx-query-failed",
+      ),
+    });
+  }
+}
+
 export async function retrieveSustainabilityContext(
   input: GenerateHomeRequest,
   limit = 4,
@@ -254,6 +351,9 @@ export async function retrieveSustainabilityContext(
     requestedLimit: normalizedLimit,
     supabaseAttempted: false,
     supabaseMatchCount: 0,
+    watsonxAttempted: false,
+    watsonxMatchCount: 0,
+    watsonxUsed: false,
     localFallbackUsed: false,
   };
 
@@ -269,40 +369,35 @@ export async function retrieveSustainabilityContext(
       supabaseMatchCount: supabaseResult.matchCount,
     };
 
-    if (!supabaseSnippets.length) {
-      return retrieveLocalFallback(input, normalizedLimit, {
-        ...supabaseDiagnostics,
-        localFallbackReason: "supabase-returned-no-matches",
-      });
+    if (supabaseSnippets.length < minimumRetrievedSnippetCount) {
+      return retrieveWatsonxOrLocalFallback(
+        input,
+        query,
+        normalizedLimit,
+        supabaseDiagnostics,
+        supabaseSnippets.length
+          ? "supabase-returned-insufficient-matches"
+          : "supabase-returned-no-matches",
+      );
     }
 
-    const localSnippets =
-      supabaseSnippets.length < minimumRetrievedSnippetCount
-        ? await retrieveLocalGuidance(input, normalizedLimit)
-        : [];
-    const snippets = dedupeSnippets(
-      [...supabaseSnippets, ...localSnippets],
-      normalizedLimit,
-    );
-
     return {
-      snippets,
-      contextText: formatRetrievedContext(snippets),
-      source: snippets.length ? "supabase-pgvector" : "none",
-      diagnostics: {
-        ...supabaseDiagnostics,
-        localFallbackUsed: localSnippets.length > 0,
-        ...(localSnippets.length > 0
-          ? { localFallbackReason: "supabase-results-padded-with-local-seed-docs" }
-          : {}),
-      },
+      snippets: supabaseSnippets,
+      contextText: formatRetrievedContext(supabaseSnippets),
+      source: "supabase-pgvector",
+      diagnostics: supabaseDiagnostics,
     };
   } catch (error) {
-    return retrieveLocalFallback(input, normalizedLimit, {
-      ...baseDiagnostics,
-      supabaseAttempted: true,
-      supabaseError: getErrorMessage(error),
-      localFallbackReason: "supabase-query-failed",
-    });
+    return retrieveWatsonxOrLocalFallback(
+      input,
+      query,
+      normalizedLimit,
+      {
+        ...baseDiagnostics,
+        supabaseAttempted: true,
+        supabaseError: getErrorMessage(error),
+      },
+      "supabase-query-failed",
+    );
   }
 }

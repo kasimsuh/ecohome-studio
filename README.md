@@ -40,11 +40,12 @@ npm run dev
 - `app/api/analyze-inspiration/route.ts` is where image analysis wiring lands
 - `app/api/generate-concept/route.ts` is the legacy mock concept route currently used by the studio UI
 - `app/api/generate-home/route.ts` is the newer structured generation route used for the real Featherless + RAG migration
-- `lib/rag/retriever.ts` is the neutral retrieval layer that will be replaced with LangChain + Supabase pgvector
+- `lib/rag/retriever.ts` is the neutral retrieval layer that currently prefers LangChain + Supabase pgvector, can fall back to a watsonx.ai vector index if configured, and finally falls back to local seed docs
 
 ## Notes
 
 - Generated projects are stored in session storage by default. This keeps the starter lightweight and demo-friendly.
 - `/results/demo` always works as a sample output route even without generating a new concept.
 - The inspiration image analysis is mocked intentionally, so you can iterate on UX before handling real upload storage or model calls.
-- The repo has pivoted away from IBM watsonx.ai. Retrieval should be implemented with LangChain and Supabase pgvector instead.
+- LangChain + Supabase pgvector remains the primary retrieval path.
+- If Supabase retrieval is unavailable, you can optionally configure a watsonx.ai vector index fallback with `WATSONX_API_KEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL`, and `WATSONX_VECTOR_INDEX_ID`.
