@@ -410,7 +410,7 @@ export function getRoofPeakHeight(floorPlan: FloorPlan, model3D: Model3D) {
   }
 
   if (model3D.roofType === "shed") {
-    return top + roofWidth * 0.18;
+    return top + roofDepth * 0.22;
   }
 
   if (model3D.roofType === "butterfly") {
@@ -1401,23 +1401,71 @@ function ShedRoof({
   top,
   roofColor,
   roofMaterial,
+  profile,
 }: {
   floorPlan: FloorPlan;
   top: number;
   roofColor: string;
   roofMaterial?: string;
+  profile: SceneStyleProfile;
 }) {
   const w = floorPlan.width + ROOF_OVERHANG * 2;
   const d = floorPlan.height + ROOF_OVERHANG * 2;
-  const rise = w * 0.18;
-  const angle = Math.atan2(rise, w);
+  const rise = d * 0.22;
+  const slopeLen = Math.sqrt(d * d + rise * rise);
+  const angle = Math.atan2(rise, d);
   const matCfg = resolveRoofMaterialConfig(roofMaterial, roofColor);
 
+  const hw = floorPlan.width / 2;
+  const hd = floorPlan.height / 2;
+  const WALL_T = 0.22;
+
+  // Triangular prism for the east wall gap (mirrored for west via scale)
+  const triGeo = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const Xo = hw + WALL_T;
+    const Xi = hw;
+    const pos = new Float32Array([
+      // outer face (east, CCW from +X)
+      Xo, top,        hd,   Xo, top,        -hd,   Xo, top + rise, -hd,
+      // inner face (west-facing, CCW from -X)
+      Xi, top,        hd,   Xi, top + rise, -hd,   Xi, top,        -hd,
+      // north rect
+      Xo, top,        -hd,  Xi, top,        -hd,   Xi, top + rise, -hd,
+      Xo, top,        -hd,  Xi, top + rise, -hd,   Xo, top + rise, -hd,
+      // sloped top
+      Xo, top + rise, -hd,  Xi, top,         hd,   Xo, top,         hd,
+      Xo, top + rise, -hd,  Xi, top + rise, -hd,   Xi, top,         hd,
+    ]);
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }, [hw, hd, top, rise]);
+
   return (
-    <group position={[0, top, 0]} rotation={[0, 0, angle]}>
-      <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
-        <boxGeometry args={[w / Math.cos(angle), 0.2, d]} />
-        <meshStandardMaterial color={matCfg.color} roughness={matCfg.roughness} metalness={matCfg.metalness} />
+    <group>
+      {/* Shed slab — south eave at Y=top, north eave at Y=top+rise */}
+      <group position={[0, top + rise / 2, 0]} rotation={[angle, 0, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[w, 0.2, slopeLen]} />
+          <meshStandardMaterial color={matCfg.color} roughness={matCfg.roughness} metalness={matCfg.metalness} />
+        </mesh>
+      </group>
+
+      {/* North wall extension — fills rectangular gap above uniform wall top */}
+      <mesh position={[0, top + rise / 2, -hd]} castShadow receiveShadow>
+        <boxGeometry args={[floorPlan.width, rise, WALL_T]} />
+        <meshStandardMaterial color={profile.wallColor} roughness={profile.wallRoughness} metalness={profile.wallMetalness} />
+      </mesh>
+
+      {/* East triangular wall fill */}
+      <mesh geometry={triGeo} castShadow receiveShadow>
+        <meshStandardMaterial color={profile.wallColor} roughness={profile.wallRoughness} metalness={profile.wallMetalness} />
+      </mesh>
+
+      {/* West triangular wall fill (mirrored) */}
+      <mesh geometry={triGeo} scale={[-1, 1, 1]} castShadow receiveShadow>
+        <meshStandardMaterial color={profile.wallColor} roughness={profile.wallRoughness} metalness={profile.wallMetalness} />
       </mesh>
     </group>
   );
@@ -1484,7 +1532,7 @@ function Roof({
     return <HipRoof floorPlan={floorPlan} top={top} roofColor={roofColor} roofMaterial={rm} roofDesign={rd} profile={profile} />;
   }
   if (type === "shed") {
-    return <ShedRoof floorPlan={floorPlan} top={top} roofColor={roofColor} roofMaterial={rm} />;
+    return <ShedRoof floorPlan={floorPlan} top={top} roofColor={roofColor} roofMaterial={rm} profile={profile} />;
   }
   if (type === "butterfly")
     return <ButterflyRoof floorPlan={floorPlan} top={top} roofColor={roofColor} roofMaterial={rm} />;
