@@ -1,461 +1,287 @@
-# EcoHome Studio
+<br/><div align="center">
 
-EcoHome Studio is a Next.js app for turning a dream-home brief into a compact, sustainability-focused home concept. The product is aimed at an early design phase: helping a user combine atmosphere, climate, budget, materials, and resilience into a single concept that feels both aspirational and grounded.
+# 🌿 EcoHome Studio
 
-In its current state, the app already supports:
+**Turn your dream home brief into a fully realized, sustainability-scored concept — in seconds.**
 
-- a minimal landing page with a prompt-first entry point
-- a guided studio flow for brief, inspiration, climate, and budget
-- inspiration image analysis based on uploaded image pixels
-- structured home-concept generation through Featherless.ai
-- retrieval-augmented sustainability guidance with layered fallbacks
-- a results experience with a detailed report rail and interactive 3D preview
-- LangChain ingestion tooling for sustainability source documents
+EcoHome Studio combines AI-powered design generation, retrieval-augmented sustainability guidance, and an interactive real-time 3D preview into a single, beautifully crafted experience. Describe your vision, upload inspiration images, and walk away with an architect-quality concept tailored to your climate, budget, and values.
 
-## Current Product Flow
+[![Next.js](https://img.shields.io/badge/Next.js_15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Three.js](https://img.shields.io/badge/Three.js-000000?style=for-the-badge&logo=three.js)](https://threejs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 
-The app currently follows this path:
+</div>
 
-1. The user starts on `/` and writes a home-design brief.
-2. The user moves into `/studio`.
-3. In the studio, the user can:
-   - refine the brief
-   - upload inspiration images
-   - set location, climate region, and budget
-4. The app analyzes uploaded images for palette, materials, and style cues.
-5. The app generates a structured home concept through `/api/generate-home`.
-6. The results are stored in browser session storage.
-7. The user is routed to `/results/[projectId]`.
-8. The results page shows:
-   - concept summary
-   - sustainability score
-   - climate and budget narratives
-   - design direction
-   - upgrades
-   - environmental impact
-   - visual prompt starters
-   - an interactive 3D home preview when geometry is available
+---
 
-There is also a permanent `/results/demo` route for a sample result.
+## ✨ What EcoHome Studio Does
 
-## What Is Real vs Legacy
+EcoHome Studio is an end-to-end AI home design platform that takes a plain-language brief and produces a complete, structured home concept including:
 
-The project contains both the newer structured generation path and an older legacy mock path.
+- 🏠 **Architectural style and massing** — body shape, roof type, facade materials, and dormer details
+- 🌱 **Sustainability scoring** — energy efficiency, water use, climate resilience, embodied carbon, and affordability rated 0–100
+- 📐 **Interactive 3D preview** — a real-time, orbit-able 3D model with per-feature overlays (solar panels, green roof, rainwater harvesting, native trees, cross-ventilation, permeable driveway)
+- 🗺️ **2D floor plan** — room-by-room layout with type-coded colour blocks
+- 💡 **Upgrade recommendations** — actionable, impact-rated improvements grounded in real sustainability guidance
+- 🎨 **Inspiration-aware generation** — upload mood board images and the platform extracts palette, materials, and aesthetic cues to steer the output
 
-### Current primary path
+---
 
-- `app/api/generate-home/route.ts`
-- `lib/ai/featherless.ts`
-- `lib/rag/retriever.ts`
-- `lib/domain/home-concept-schema.ts`
-- `components/studio/studio-wizard.tsx`
+## 🚀 Product Flow
 
-This is the path the studio now prefers.
-
-### Legacy fallback path
-
-- `app/api/generate-concept/route.ts`
-- `lib/ai/mock-provider.ts`
-- `lib/domain/mock-data.ts`
-
-This still exists as a demo-safe fallback if the structured API path fails.
-
-## Tech Stack
-
-### App and UI
-
-- Next.js 15 with App Router
-- React 19
-- TypeScript
-- Tailwind CSS v4
-
-### AI and retrieval
-
-- Featherless.ai via OpenAI-compatible API for structured JSON generation
-- LangChain for ingestion and vector-store integration
-- Supabase pgvector as the primary vector retrieval path
-- Optional watsonx.ai vector-index fallback if Supabase retrieval is unavailable
-- Local markdown seed-doc fallback if both remote retrieval paths fail
-
-### 3D and visual rendering
-
-- `three`
-- `@react-three/fiber`
-- `@react-three/drei`
-- SVG-based floor plan rendering
-
-### Validation and testing
-
-- Zod
-- Vitest
-- Testing Library
-
-## Architecture Overview
-
-### Routes
-
-- `app/page.tsx`
-  Landing page with a minimal Claude-inspired composition and a prompt box.
-
-- `app/studio/page.tsx`
-  The guided concept-building flow.
-
-- `app/results/[projectId]/page.tsx`
-  Loads a generated project from session storage and renders the results experience.
-
-### API routes
-
-- `app/api/analyze-inspiration/route.ts`
-  Accepts uploaded images, validates them, runs pixel-based inspiration analysis, and falls back to filename-based mock analysis if needed.
-
-- `app/api/generate-home/route.ts`
-  Validates the structured request, retrieves sustainability context, calls Featherless, and returns a structured payload. If generation fails, it returns a structured fallback concept instead.
-
-- `app/api/generate-concept/route.ts`
-  The older mock route still used as a backup path.
-
-## Generation Pipeline
-
-The newer generation pipeline looks like this:
-
-1. `StudioWizard` builds a `GenerateHomeRequest`
-2. `/api/generate-home` validates the payload with Zod
-3. `lib/rag/retriever.ts` retrieves guidance
-4. `lib/ai/featherless.ts` sends the user brief plus retrieved context to Featherless
-5. Featherless is asked to return strict JSON only
-6. The output is normalized and validated against the home-concept schema
-7. The structured payload is stored in session storage
-8. The results page adapts that payload for the current report UI
-
-### Retrieval fallback order
-
-The current retrieval order is:
-
-1. Supabase pgvector via LangChain
-2. watsonx.ai vector index, if configured
-3. local seed guidance markdown files
-
-This makes the app resilient for demos even when external providers are slow or unavailable.
-
-## Inspiration Analysis
-
-Inspiration image handling is no longer filename-only.
-
-`lib/inspiration/analyze-uploaded-images.ts` uses `sharp` to inspect uploaded image pixels and infer:
-
-- aesthetic direction
-- palette
-- likely material cues
-- lighting character
-- layout hints
-- a short summary
-
-If the pixel-based analyzer fails, the API falls back to the older provider-based mock analysis.
-
-## Results Experience
-
-The results UI is split into two major pieces:
-
-- `components/results/results-rail.tsx`
-  The report-style side rail with summaries, scores, narratives, and upgrades
-
-- `components/results/home-3d-preview.tsx`
-  The interactive 3D view and floor-plan overlay
-
-`components/results/results-view.tsx` lazy-loads the heavy 3D view so the report rail can appear faster.
-
-## Session Storage
-
-Generated concepts are intentionally stored in browser session storage for demo simplicity.
-
-- Storage helper: `lib/session.ts`
-- Key shape: `ecohome:project:<projectId>`
-
-This means:
-
-- generated concepts are not persisted across browsers or devices
-- a cleared session removes generated results
-- the demo route is useful when no stored result exists
-
-## Domain Model
-
-The main structured schema lives in:
-
-- `lib/domain/home-concept-schema.ts`
-
-It defines:
-
-- request payloads
-- the canonical structured home concept
-- the generated home concept payload returned by the API
-
-Important concept sections include:
-
-- `conceptSummary`
-- `sustainabilityScore`
-- `floorPlan`
-- `model3D`
-- `upgrades`
-- `materials`
-- `visualPrompts`
-- `sources`
-
-There is also an adapter layer in:
-
-- `lib/domain/structured-home-adapter.ts`
-
-That adapter lets the newer structured payload feed the older results presentation model without rewriting the entire UI at once.
-
-## Project Structure
-
-### App layer
-
-```text
-app/
-  api/
-    analyze-inspiration/
-    generate-concept/
-    generate-home/
-  results/
-    [projectId]/
-  studio/
-  fonts/
-  globals.css
-  layout.tsx
-  page.tsx
+```
+Brief → Studio → AI Generation → Results → 3D Preview
 ```
 
-### UI components
+1. **Land** — write your dream home brief on the homepage
+2. **Studio** — refine the brief, upload inspiration images, set location, climate, and budget
+3. **Analyze** — pixel-level image analysis extracts your palette, material preferences, and aesthetic direction
+4. **Generate** — a structured concept is produced through an AI pipeline grounded in curated sustainability guidance
+5. **Explore** — browse the full concept report and orbit the interactive 3D model of your home
 
-```text
-components/
-  results/
-    floor-plan-2d.tsx
-    home-3d-preview.tsx
-    results-client.tsx
-    results-rail.tsx
-    results-view.tsx
-  site/
-    site-brand.tsx
-    site-footer.tsx
-    site-header.tsx
-  studio/
-    studio-wizard.tsx
-    studio-wizard-panels.tsx
-  ui/
-    button.tsx
-    card.tsx
-    section-heading.tsx
+> Try the live demo instantly at `/results/demo` — no brief required.
+
+---
+
+## 🏗️ Tech Stack
+
+### 🖥️ App & UI
+| Technology | Purpose |
+|---|---|
+| Next.js 15 (App Router) | Full-stack framework, SSR, routing |
+| React 19 | UI component model |
+| TypeScript | End-to-end type safety |
+| Tailwind CSS v4 | Utility-first styling |
+
+### 🤖 AI & Retrieval
+| Technology | Purpose |
+|---|---|
+| Featherless.ai | Structured JSON home-concept generation via OpenAI-compatible API |
+| LangChain | RAG ingestion pipeline and vector-store integration |
+| Supabase pgvector | Primary semantic retrieval for sustainability guidance |
+| watsonx.ai | Secondary vector-index fallback |
+| Local seed docs | Tertiary fallback — always available, no network required |
+| `sharp` | Pixel-level inspiration image analysis |
+
+### 🎨 3D & Visual
+| Technology | Purpose |
+|---|---|
+| Three.js | 3D scene geometry |
+| `@react-three/fiber` | React renderer for Three.js |
+| `@react-three/drei` | Camera, controls, and helpers |
+| SVG | 2D floor plan rendering |
+
+### 🧪 Validation & Testing
+| Technology | Purpose |
+|---|---|
+| Zod | Request and schema validation |
+| Vitest | Unit and integration test runner |
+| Testing Library | Component and UI tests |
+
+---
+
+## 🌍 AI Generation Pipeline
+
+```
+StudioWizard
+    │
+    ▼
+POST /api/generate-home
+    │
+    ├── Zod validation
+    │
+    ├── RAG retrieval (Supabase → watsonx → local seed)
+    │
+    ├── Featherless.ai structured generation
+    │
+    ├── Schema normalization + Zod validation
+    │
+    └── Structured payload → session storage → /results/[projectId]
 ```
 
-### Business logic and providers
+The retrieval layer grounds every concept in real sustainability science — passive solar design, water-smart landscaping, envelope-first cold-climate strategy, and embodied-carbon-aware material selection — pulled from ingested source documents at query time.
+
+### 🔄 Retrieval Fallback Order
+
+1. **Supabase pgvector** via LangChain — primary semantic search
+2. **watsonx.ai vector index** — secondary, if configured
+3. **Local seed guidance markdown** — always available, no external dependency
+
+The system is resilient by design. Even with no cloud credentials configured, it generates a grounded, useful concept.
+
+---
+
+## 🏠 3D Preview Engine
+
+The interactive 3D home preview is a fully custom procedural renderer built on React Three Fiber. Given a structured `model3D` payload, it renders:
+
+| Feature | Detail |
+|---|---|
+| **Roof types** | Gable, hip, shed, butterfly, flat — each geometrically accurate |
+| **Roof detailing** | Tile/shingle courses, soffits, fascias, gutters, rake boards, dormers |
+| **Roof design styles** | Craftsman, contemporary, traditional — randomly seeded if unspecified |
+| **Body shapes** | Box, L-shape, split-level — with proper massing volumes |
+| **Facade materials** | Timber board, brick, rendered plaster, stone veneer, metal panel, fiber cement |
+| **Sustainability overlays** | Solar array, green roof, rainwater tank, native trees, permeable driveway, cross-ventilation arrows |
+| **Windows & doors** | Per-wall, per-floor openings with frame and glass materials |
+| **Chimneys & decks** | Fully modelled structural details |
+| **Tree placement** | Seeded-random canopy trees, collision-aware — never placed inside the building footprint |
+
+All geometry is deterministic and seed-stable: the same concept always renders identically.
+
+---
+
+## 📁 Project Structure
 
 ```text
-lib/
-  ai/
-    contracts.ts
-    featherless.ts
-    index.ts
-    mock-provider.ts
-  api/
-    generate-home-response.ts
-  domain/
-    constants.ts
-    home-concept-schema.ts
-    home-geometry.ts
-    mock-data.ts
-    sample-project.ts
-    sample-structured-home.ts
-    structured-home-adapter.ts
-    structured-home-fallback.ts
-    types.ts
-    validation.ts
-  inspiration/
-    analyze-uploaded-images.ts
-  rag/
-    embeddings.ts
-    ingestion.ts
-    local-knowledge.ts
-    retriever.ts
-    supabase.ts
-    watsonx.ts
-    knowledge/
-  session.ts
+├── app/
+│   ├── api/
+│   │   ├── analyze-inspiration/     # Pixel-based image analysis
+│   │   ├── generate-home/           # Primary AI generation endpoint
+│   │   └── generate-concept/        # Legacy fallback endpoint
+│   ├── results/[projectId]/         # Dynamic results page
+│   ├── studio/                      # Guided brief builder
+│   └── page.tsx                     # Landing page
+│
+├── components/
+│   ├── results/
+│   │   ├── home-3d-preview.tsx      # Interactive 3D model + floor plan
+│   │   ├── results-rail.tsx         # Report-style results sidebar
+│   │   └── results-view.tsx         # Lazy-loaded results container
+│   └── studio/
+│       └── studio-wizard.tsx        # Multi-step brief flow
+│
+├── lib/
+│   ├── ai/
+│   │   └── featherless.ts           # Structured generation client
+│   ├── domain/
+│   │   ├── home-concept-schema.ts   # Zod schema for all concepts
+│   │   └── types.ts                 # Core domain types
+│   ├── inspiration/
+│   │   └── analyze-uploaded-images.ts
+│   └── rag/
+│       ├── retriever.ts             # Layered retrieval with fallbacks
+│       ├── supabase.ts
+│       └── watsonx.ts
+│
+├── scripts/
+│   └── ingest-rag-docs.ts           # LangChain ingestion pipeline
+└── tests/
+    ├── ui/                          # Component tests
+    └── unit/                        # Schema, geometry, AI, retrieval
 ```
 
-### Tooling and infrastructure
+---
 
-```text
-scripts/
-  ingest-rag-docs.ts
+## ⚙️ Environment Variables
 
-supabase/
-  langchain_vector_setup.sql
-
-tests/
-  ui/
-  unit/
-```
-
-## Styling and Design Direction
-
-The current design language is intentional and should be treated as part of the project identity:
-
-- beige and warm neutral backgrounds
-- green as the primary text and accent color
-- a minimal, calm homepage with a centered prompt flow
-- Silkscreen as a display font for headings and labels only
-- regular body sans font for readable paragraphs and form text
-
-The local Silkscreen font lives in:
-
-- `app/fonts/silkscreen/`
-- `app/fonts.ts`
-
-## Environment Variables
-
-Copy `.env.example` into `.env` before wiring providers:
+Copy `.env.example` to `.env` and fill in the providers you want to use:
 
 ```bash
 cp .env.example .env
 ```
 
-Current env variables include:
+| Variable | Purpose |
+|---|---|
+| `FEATHERLESS_API_KEY` | AI generation (required for live generation) |
+| `FEATHERLESS_MODEL` | Model selection |
+| `FEATHERLESS_BASE_URL` | API base URL |
+| `SUPABASE_URL` | Primary vector retrieval |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase auth |
+| `OPENAI_API_KEY` | Embeddings provider |
+| `WATSONX_API_KEY` | Secondary retrieval |
+| `WATSONX_PROJECT_ID` | watsonx project |
+| `WATSONX_URL` | watsonx endpoint |
+| `WATSONX_VECTOR_INDEX_ID` | Secondary vector index |
 
-- `FEATHERLESS_API_KEY`
-- `FEATHERLESS_MODEL`
-- `FEATHERLESS_BASE_URL`
-- `FEATHERLESS_TIMEOUT_MS`
-- `FEATHERLESS_MAX_TOKENS`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `EMBEDDING_PROVIDER`
-- `EMBEDDING_MODEL`
-- `EMBEDDING_DIMENSIONS`
-- `OPENAI_API_KEY`
-- `OPENAI_EMBEDDING_TIMEOUT_MS`
-- `WATSONX_API_KEY`
-- `WATSONX_PROJECT_ID`
-- `WATSONX_URL`
-- `WATSONX_VECTOR_INDEX_ID`
-- `WATSONX_TIMEOUT_MS`
-- `RAG_SUPABASE_TIMEOUT_MS`
-- `RAG_DOCS_DIR`
-- `RAG_CHUNK_SIZE`
-- `RAG_CHUNK_OVERLAP`
+> **None of these are strictly required to run the app.** Every provider layer has a fallback. The app runs fully offline for demos.
 
-### Practical note
+---
 
-You do not need every provider configured for the app to run. The project is designed to degrade gracefully:
-
-- Featherless missing: structured fallback concept is returned
-- Supabase unavailable: retrieval falls back
-- watsonx unavailable: retrieval falls back again
-
-## Supabase and RAG Setup
-
-If you want the primary RAG path working end-to-end:
-
-1. Create a Supabase project
-2. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `.env`
-3. Run the SQL in `supabase/langchain_vector_setup.sql`
-4. Add source PDFs, markdown files, or text files to `rag-docs/`
-5. Configure embeddings env vars
-6. Run:
+## 🛠️ Local Development
 
 ```bash
-npm run rag:ingest
-```
-
-The ingestion script:
-
-- loads PDF, `.md`, and `.txt` files
-- splits them with `RecursiveCharacterTextSplitter`
-- tags metadata like source, filename, category, and page
-- writes the resulting chunks into Supabase through LangChain
-
-## Local Development
-
-Install dependencies:
-
-```bash
+# Install dependencies
 npm install
-```
 
-Start the app:
-
-```bash
+# Start the development server
 npm run dev
 ```
 
-Open:
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-```text
-http://localhost:3000
-```
+---
 
-## Scripts
+## 📦 RAG Setup (Optional)
 
-- `npm run dev`
-  Start the Next.js development server
-
-- `npm run build`
-  Build the production app
-
-- `npm run start`
-  Run the built app
-
-- `npm run lint`
-  Lint the repository
-
-- `npm run test`
-  Run all tests once
-
-- `npm run test:watch`
-  Run tests in watch mode
-
-- `npm run rag:ingest`
-  Ingest RAG source documents into Supabase
-
-## Testing
-
-Tests currently cover:
-
-- schema validation
-- retrieval behavior
-- Featherless normalization and fallback handling
-- inspiration image analysis
-- generation route behavior
-- studio flow
-- results rendering
-- 3D geometry helpers
-
-Run the main checks with:
+To enable full semantic retrieval from your own sustainability documents:
 
 ```bash
-npm run lint
-npm run test
-npm run build
+# 1. Create a Supabase project and configure credentials in .env
+# 2. Run the vector store SQL migration
+#    supabase/langchain_vector_setup.sql
+
+# 3. Add source PDFs, markdown, or text files to rag-docs/
+
+# 4. Ingest them
+npm run rag:ingest
 ```
 
-## Current State Summary
+The ingestion pipeline uses LangChain's `RecursiveCharacterTextSplitter` to chunk documents, tags each chunk with source metadata, and writes embeddings into Supabase pgvector.
 
-Right now the project is beyond a pure mock starter, but not yet a fully productionized system.
+---
 
-Implemented today:
+## 🧪 Testing
 
-- real structured generation endpoint
-- real retrieval abstraction
-- real LangChain ingestion setup
-- real pixel-based inspiration analysis
-- real 3D result rendering
-- graceful fallbacks across providers
+```bash
+npm run lint        # Lint the codebase
+npm run test        # Run all 49 tests
+npm run build       # Production build check
+```
 
-Still intentionally lightweight or transitional:
+Test coverage includes:
 
-- browser-only session storage persistence
-- legacy `generate-concept` path still present as backup
-- structured payload still adapted into an older report model for parts of the results UI
-- external providers may fall back depending on credentials, latency, quota, or environment
+- ✅ Zod schema validation (concept structure, geometry bounds, opening placement)
+- ✅ 3D geometry helpers (roof peak height, tree placement, rainwater tank placement)
+- ✅ RAG retrieval behavior and fallback ordering
+- ✅ Featherless normalization and error handling
+- ✅ Inspiration image analysis
+- ✅ Generation route end-to-end
+- ✅ Studio wizard flow (submit, fallback, validation)
+- ✅ Results page rendering
 
-That tradeoff is deliberate: the app is optimized to stay demoable even when some AI infrastructure is unavailable.
+---
+
+## 📜 Available Scripts
+
+| Script | Description |
+|---|---|
+| `npm run dev` | Start the Next.js development server |
+| `npm run build` | Build for production |
+| `npm run start` | Run the production build |
+| `npm run lint` | Lint the repository |
+| `npm run test` | Run all tests once |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run rag:ingest` | Ingest RAG source documents into Supabase |
+
+---
+
+## 🎨 Design System
+
+EcoHome Studio has a deliberate, calm visual identity:
+
+- **Palette** — warm beige and neutral backgrounds, green as the primary accent
+- **Typography** — Silkscreen display font for headings and labels; clean sans-serif for body text
+- **Layout** — prompt-first entry point, minimal chrome, content-forward results experience
+
+---
+
+<div align="center">
+
+**Built with 💚 for a more sustainable future**
+
+*EcoHome Studio — where your dream home meets the planet.*
+
+</div>
