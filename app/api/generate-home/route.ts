@@ -57,13 +57,22 @@ export async function POST(request: Request) {
         "x-ecohome-rag-supabase-match-count": String(
           guidance.diagnostics.supabaseMatchCount,
         ),
+        "x-ecohome-rag-watsonx-attempted": String(
+          guidance.diagnostics.watsonxAttempted,
+        ),
+        "x-ecohome-rag-watsonx-match-count": String(
+          guidance.diagnostics.watsonxMatchCount,
+        ),
+        "x-ecohome-rag-watsonx-used": String(
+          guidance.diagnostics.watsonxUsed,
+        ),
         "x-ecohome-rag-local-fallback-used": String(
           guidance.diagnostics.localFallbackUsed,
         ),
-        ...(guidance.diagnostics.localFallbackReason
+        ...(guidance.diagnostics.fallbackReason
           ? {
               "x-ecohome-rag-fallback-reason": compactHeaderValue(
-                guidance.diagnostics.localFallbackReason,
+                guidance.diagnostics.fallbackReason,
               ),
             }
           : {}),
@@ -71,6 +80,13 @@ export async function POST(request: Request) {
           ? {
               "x-ecohome-rag-supabase-error": compactHeaderValue(
                 guidance.diagnostics.supabaseError,
+              ),
+            }
+          : {}),
+        ...(guidance.diagnostics.watsonxError
+          ? {
+              "x-ecohome-rag-watsonx-error": compactHeaderValue(
+                guidance.diagnostics.watsonxError,
               ),
             }
           : {}),
@@ -101,13 +117,22 @@ export async function POST(request: Request) {
         "x-ecohome-rag-supabase-match-count": String(
           guidance.diagnostics.supabaseMatchCount,
         ),
+        "x-ecohome-rag-watsonx-attempted": String(
+          guidance.diagnostics.watsonxAttempted,
+        ),
+        "x-ecohome-rag-watsonx-match-count": String(
+          guidance.diagnostics.watsonxMatchCount,
+        ),
+        "x-ecohome-rag-watsonx-used": String(
+          guidance.diagnostics.watsonxUsed,
+        ),
         "x-ecohome-rag-local-fallback-used": String(
           guidance.diagnostics.localFallbackUsed,
         ),
-        ...(guidance.diagnostics.localFallbackReason
+        ...(guidance.diagnostics.fallbackReason
           ? {
               "x-ecohome-rag-fallback-reason": compactHeaderValue(
-                guidance.diagnostics.localFallbackReason,
+                guidance.diagnostics.fallbackReason,
               ),
             }
           : {}),
@@ -115,6 +140,13 @@ export async function POST(request: Request) {
           ? {
               "x-ecohome-rag-supabase-error": compactHeaderValue(
                 guidance.diagnostics.supabaseError,
+              ),
+            }
+          : {}),
+        ...(guidance.diagnostics.watsonxError
+          ? {
+              "x-ecohome-rag-watsonx-error": compactHeaderValue(
+                guidance.diagnostics.watsonxError,
               ),
             }
           : {}),

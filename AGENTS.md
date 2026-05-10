@@ -385,6 +385,8 @@ From `.env.example`:
 - `EMBEDDING_PROVIDER`
 - `EMBEDDING_MODEL`
 - `OPENAI_API_KEY`
+- Optional watsonx.ai RAG fallback:
+  `WATSONX_API_KEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL`, `WATSONX_VECTOR_INDEX_ID`
 - `IMAGE_MODEL_PROVIDER`
 - `VISION_MODEL_PROVIDER`
 
@@ -393,7 +395,7 @@ From `.env.example`:
 1. Keep mock provider as fallback for the legacy flow.
 2. Keep Featherless as the structured generation model.
 3. Implement retrieval behind `lib/rag/retriever.ts`.
-4. Use LangChain + Supabase pgvector instead of watsonx.ai.
+4. Prefer LangChain + Supabase pgvector, with watsonx.ai vector index as an optional secondary fallback if Supabase retrieval is unavailable.
 5. Do not let missing provider credentials break the demo experience.
 
 ---
