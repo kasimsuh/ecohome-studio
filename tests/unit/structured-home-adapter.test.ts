@@ -27,5 +27,9 @@ describe("structured-home-adapter", () => {
     expect(concept.visualPrompts).toHaveLength(3);
     expect(concept.environmentalImpact.energyReduction).toContain("%");
     expect(concept.designPrinciples.length).toBeGreaterThan(2);
+    expect(concept.floorPlan).toEqual(sampleStructuredHomeConcept.floorPlan);
+    expect(concept.model3D).toEqual(sampleStructuredHomeConcept.model3D);
+    expect(concept.materials).toEqual(sampleStructuredHomeConcept.materials);
+    expect(concept.upgrades).toEqual(sampleStructuredHomeConcept.upgrades);
   });
 });

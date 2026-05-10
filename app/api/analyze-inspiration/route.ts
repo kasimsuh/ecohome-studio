@@ -6,6 +6,7 @@ import {
   MAX_INSPIRATION_IMAGES
 } from "@/lib/domain/constants";
 import { createInspirationImageRecord } from "@/lib/domain/mock-data";
+import { analyzeUploadedInspirationImages } from "@/lib/inspiration/analyze-uploaded-images";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -37,10 +38,37 @@ export async function POST(request: Request) {
   }
 
   const imageRecords = files.map((file) => createInspirationImageRecord(file));
-  const styleAnalysis = await ecoHomeAi.analyzeInspirationImages(imageRecords);
 
-  return NextResponse.json({
-    styleAnalysis,
-    inspirationImages: imageRecords
-  });
+  try {
+    const styleAnalysis = await analyzeUploadedInspirationImages({
+      files,
+      imageRecords
+    });
+
+    return NextResponse.json(
+      {
+        styleAnalysis,
+        inspirationImages: imageRecords
+      },
+      {
+        headers: {
+          "x-ecohome-inspiration-source": "pixel-analysis"
+        }
+      }
+    );
+  } catch {
+    const styleAnalysis = await ecoHomeAi.analyzeInspirationImages(imageRecords);
+
+    return NextResponse.json(
+      {
+        styleAnalysis,
+        inspirationImages: imageRecords
+      },
+      {
+        headers: {
+          "x-ecohome-inspiration-source": "filename-fallback"
+        }
+      }
+    );
+  }
 }

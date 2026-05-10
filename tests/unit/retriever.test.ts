@@ -164,6 +164,9 @@ describe("retrieveSustainabilityContext", () => {
     expect(result.snippets[0].title).toContain("Passive Cooling");
     expect(result.snippets[0].source).toBe("passive-cooling.pdf (p. 2)");
     expect(result.contextText).toContain("[1]");
+    expect(result.diagnostics.supabaseAttempted).toBe(true);
+    expect(result.diagnostics.supabaseMatchCount).toBe(3);
+    expect(result.diagnostics.localFallbackUsed).toBe(false);
   });
 
   it("pads sparse vector results with local fallback guidance", async () => {
@@ -188,6 +191,12 @@ describe("retrieveSustainabilityContext", () => {
     expect(mockRetrieveLocalGuidance).toHaveBeenCalledWith(sampleInput, 4);
     expect(result.source).toBe("supabase-pgvector");
     expect(result.snippets.length).toBeGreaterThanOrEqual(3);
+    expect(result.diagnostics.supabaseAttempted).toBe(true);
+    expect(result.diagnostics.supabaseMatchCount).toBe(1);
+    expect(result.diagnostics.localFallbackUsed).toBe(true);
+    expect(result.diagnostics.localFallbackReason).toBe(
+      "supabase-results-padded-with-local-seed-docs",
+    );
   });
 
   it("falls back to local seed docs when Supabase retrieval fails", async () => {
@@ -198,5 +207,9 @@ describe("retrieveSustainabilityContext", () => {
     expect(result.source).toBe("local-seed-docs");
     expect(result.snippets).toEqual(localFallbackSnippets);
     expect(result.contextText).toContain("climate-resilience.md");
+    expect(result.diagnostics.supabaseAttempted).toBe(true);
+    expect(result.diagnostics.localFallbackUsed).toBe(true);
+    expect(result.diagnostics.localFallbackReason).toBe("supabase-query-failed");
+    expect(result.diagnostics.supabaseError).toContain("Missing SUPABASE_URL");
   });
 });

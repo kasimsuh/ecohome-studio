@@ -39,5 +39,10 @@ describe("POST /api/generate-home", () => {
     expect(payload.projectId).toMatch(/^eco-/);
     expect(payload.floorPlan?.rooms.length).toBeGreaterThan(0);
     expect(payload.model3D?.floors).toBeGreaterThan(0);
+    expect(response.headers.get("x-ecohome-provider")).toBe("fallback");
+    expect(response.headers.get("x-ecohome-provider-error")).toContain(
+      "Featherless credentials are not configured",
+    );
+    expect(response.headers.get("x-ecohome-rag-local-fallback-used")).toBe("true");
   });
 });
