@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 import { buildGenerateHomeResponseHeaders } from "@/lib/api/generate-home-response";
 import { generateStructuredHomeConceptWithFeatherless } from "@/lib/ai/featherless";
 import { generateHomeRequestSchema } from "@/lib/domain/home-concept-schema";
+import type { GeneratedHomeConceptPayload } from "@/lib/domain/home-concept-schema";
 import { createFallbackStructuredHomeConcept } from "@/lib/domain/structured-home-fallback";
 import { retrieveSustainabilityContext } from "@/lib/rag/retriever";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -12,6 +14,31 @@ function getErrorMessage(error: unknown) {
   }
 
   return String(error);
+}
+
+async function trySaveProject(concept: GeneratedHomeConceptPayload) {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { error } = await supabase.from("projects").upsert(
+      {
+        user_id: user.id,
+        name: `${concept.architecturalStyle} for ${concept.location}`,
+        project_id: concept.projectId,
+        data: concept,
+      },
+      { onConflict: "project_id" },
+    );
+
+    if (error) {
+      console.error("[trySaveProject] upsert failed:", error);
+    }
+  } catch (err) {
+    console.error("[trySaveProject] unexpected error:", err);
+  }
 }
 
 export async function POST(request: Request) {
@@ -37,6 +64,8 @@ export async function POST(request: Request) {
       guidanceSnippets: guidance.snippets,
     });
 
+    await trySaveProject(concept);
+
     return NextResponse.json(concept, {
       headers: buildGenerateHomeResponseHeaders({
         provider: "featherless",
@@ -49,6 +78,8 @@ export async function POST(request: Request) {
       input,
       guidanceSnippets: guidance.snippets,
     });
+
+    await trySaveProject(fallback);
 
     return NextResponse.json(fallback, {
       headers: buildGenerateHomeResponseHeaders({

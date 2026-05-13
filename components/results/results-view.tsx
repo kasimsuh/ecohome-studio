@@ -2,7 +2,13 @@ import { Home3DPreview } from "@/components/results/home-3d-preview";
 import { ResultsRail } from "@/components/results/results-rail";
 import type { GeneratedHomeConcept } from "@/lib/domain/types";
 
-export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
+export function ResultsView({
+  project,
+  onCapture,
+}: {
+  project: GeneratedHomeConcept;
+  onCapture?: (dataUrl: string) => void;
+}) {
   const hasInteractiveModel = Boolean(project.floorPlan && project.model3D);
 
   if (!hasInteractiveModel || !project.floorPlan || !project.model3D) {
@@ -27,6 +33,7 @@ export function ResultsView({ project }: { project: GeneratedHomeConcept }) {
           styleAnalysis={project.styleAnalysis}
           sceneSeed={`${project.projectId}:${project.location}:${project.architecturalStyle}`}
           variant="workspace"
+          onCapture={onCapture}
         />
       </main>
     </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
   Sky,
@@ -2713,6 +2713,31 @@ function FeaturePopup({
   );
 }
 
+function ScreenshotCapture({ onCapture }: { onCapture: (dataUrl: string) => void }) {
+  const { gl } = useThree();
+  const frame = useRef(0);
+  const done = useRef(false);
+
+  // Priority -1 fires AFTER R3F renders the scene each frame.
+  // We skip the first 30 frames (~0.5s) so the sky/environment/shadows finish loading.
+  useFrame(() => {
+    if (done.current) return;
+    frame.current += 1;
+    if (frame.current < 30) return;
+    done.current = true;
+    const offscreen = document.createElement("canvas");
+    offscreen.width = 480;
+    offscreen.height = 270;
+    const ctx = offscreen.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(gl.domElement, 0, 0, 480, 270);
+      onCapture(offscreen.toDataURL("image/jpeg", 0.75));
+    }
+  }, -1);
+
+  return null;
+}
+
 export function Home3DPreview({
   floorPlan,
   model3D,
@@ -2728,6 +2753,7 @@ export function Home3DPreview({
   sceneSeed,
   className,
   variant = "card",
+  onCapture,
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
@@ -2743,6 +2769,7 @@ export function Home3DPreview({
   sceneSeed?: string;
   className?: string;
   variant?: "card" | "workspace";
+  onCapture?: (dataUrl: string) => void;
 }) {
   const [showFloorPlan, setShowFloorPlan] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<
@@ -2805,6 +2832,7 @@ export function Home3DPreview({
         <div className="absolute inset-0" data-testid="home-3d-canvas">
           <Canvas
             shadows
+            gl={{ preserveDrawingBuffer: true }}
             camera={{
               position: [cameraDistance, FLOOR_HEIGHT * 2.2, cameraDistance],
               fov: 50,
@@ -2816,6 +2844,7 @@ export function Home3DPreview({
               sceneSeed={resolvedSceneSeed}
               promptContext={promptContext}
             />
+            {onCapture && <ScreenshotCapture onCapture={onCapture} />}
           </Canvas>
         </div>
 
