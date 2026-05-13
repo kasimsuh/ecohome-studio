@@ -14,11 +14,20 @@ import { sampleGeneratedHomeConcept } from "@/lib/domain/sample-project";
 import type { GeneratedHomeConcept } from "@/lib/domain/types";
 import { getProjectStorageKey } from "@/lib/session";
 
-export function ResultsClient({ projectId }: { projectId: string }) {
-  const [project, setProject] = useState<GeneratedHomeConcept | null>(null);
-  const [ready, setReady] = useState(false);
+export function ResultsClient({
+  projectId,
+  initialProject = null,
+}: {
+  projectId: string;
+  initialProject?: GeneratedHomeConcept | null;
+}) {
+  const [project, setProject] = useState<GeneratedHomeConcept | null>(initialProject);
+  const [ready, setReady] = useState(initialProject !== null);
 
   useEffect(() => {
+    // Server already loaded the project from the DB — skip sessionStorage
+    if (initialProject !== null) return;
+
     if (projectId === "demo") {
       setProject(sampleGeneratedHomeConcept);
       setReady(true);
@@ -45,7 +54,7 @@ export function ResultsClient({ projectId }: { projectId: string }) {
     } finally {
       setReady(true);
     }
-  }, [projectId]);
+  }, [projectId, initialProject]);
 
   if (!ready) {
     return (
