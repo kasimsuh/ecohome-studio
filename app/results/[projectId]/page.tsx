@@ -1,5 +1,9 @@
 import { ResultsClient } from "@/components/results/results-client";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  adaptStructuredConceptToGeneratedHomeConcept,
+  isStructuredGeneratedHomeConceptPayload,
+} from "@/lib/domain/structured-home-adapter";
 import type { GeneratedHomeConcept } from "@/lib/domain/types";
 
 export default async function ResultsPage({
@@ -24,7 +28,10 @@ export default async function ResultsPage({
           .single();
 
         if (data?.data) {
-          initialProject = data.data as GeneratedHomeConcept;
+          const raw = data.data as unknown;
+          initialProject = isStructuredGeneratedHomeConceptPayload(raw)
+            ? adaptStructuredConceptToGeneratedHomeConcept(raw)
+            : (raw as GeneratedHomeConcept);
         }
       }
     } catch {

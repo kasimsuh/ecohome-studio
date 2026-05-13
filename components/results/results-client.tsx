@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ResultsView } from "@/components/results/results-view";
 import { buttonStyles } from "@/components/ui/button";
@@ -23,6 +23,20 @@ export function ResultsClient({
 }) {
   const [project, setProject] = useState<GeneratedHomeConcept | null>(initialProject);
   const [ready, setReady] = useState(initialProject !== null);
+  const thumbnailSaved = useRef(false);
+
+  const handleCapture = useCallback(
+    (dataUrl: string) => {
+      if (thumbnailSaved.current || projectId === "demo") return;
+      thumbnailSaved.current = true;
+      fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thumbnail: dataUrl }),
+      }).catch(() => {/* non-fatal */});
+    },
+    [projectId],
+  );
 
   useEffect(() => {
     // Server already loaded the project from the DB — skip sessionStorage
@@ -95,5 +109,5 @@ export function ResultsClient({
     );
   }
 
-  return <ResultsView project={project} />;
+  return <ResultsView project={project} onCapture={handleCapture} />;
 }

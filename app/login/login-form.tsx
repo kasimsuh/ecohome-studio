@@ -29,7 +29,7 @@ export function LoginForm() {
       setError(error.message);
       setLoading(false);
     } else {
-      router.push(redirectTo);
+      router.push(redirectTo as Parameters<typeof router.push>[0]);
       router.refresh();
     }
   }

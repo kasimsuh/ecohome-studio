@@ -5,7 +5,7 @@ import { BackgroundScene } from "@/components/site/background-scene";
 import { SiteBrand } from "@/components/site/site-brand";
 import { buttonStyles } from "@/components/ui/button";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { GeneratedHomeConcept } from "@/lib/domain/types";
+import type { GeneratedHomeConceptPayload } from "@/lib/domain/home-concept-schema";
 
 const climateLabels: Record<string, string> = {
   "hot-arid": "Hot & Arid",
@@ -26,7 +26,8 @@ type ProjectRow = {
   name: string;
   project_id: string;
   created_at: string;
-  data: GeneratedHomeConcept;
+  thumbnail?: string | null;
+  data: GeneratedHomeConceptPayload;
 };
 
 function ScoreBadge({ score }: { score: number }) {
@@ -38,8 +39,18 @@ function ScoreBadge({ score }: { score: number }) {
         : "bg-[color:var(--surface-muted)] text-[color:var(--muted)]";
 
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${color}`}>
-      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${color}`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="h-3 w-3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z" />
         <path d="m9 12 2 2 4-4" />
       </svg>
@@ -60,31 +71,60 @@ function ProjectCard({ row }: { row: ProjectRow }) {
   return (
     <Link
       href={`/results/${row.project_id}`}
-      className="group flex flex-col rounded-[1.75rem] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,250,242,0.94),rgba(247,239,227,0.96))] p-6 shadow-[0_8px_32px_rgba(90,81,61,0.08)] backdrop-blur-xl transition hover:shadow-[0_12px_40px_rgba(90,81,61,0.14)] hover:-translate-y-0.5"
+      className="group flex flex-col rounded-[1.75rem] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,250,242,0.94),rgba(247,239,227,0.96))] shadow-[0_8px_32px_rgba(90,81,61,0.08)] backdrop-blur-xl transition hover:shadow-[0_12px_40px_rgba(90,81,61,0.14)] hover:-translate-y-0.5 overflow-hidden"
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <ScoreBadge score={score} />
-        <span className="text-xs text-[color:var(--muted)]">{date}</span>
-      </div>
+      {row.thumbnail ? (
+        <div className="relative h-44 w-full overflow-hidden bg-[#e8ddca]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={row.thumbnail}
+            alt=""
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        </div>
+      ) : (
+        <div className="flex h-44 w-full items-center justify-center bg-[linear-gradient(135deg,#e8ddca,#d4c9b0)]">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-10 w-10 text-[color:var(--accent)]/40"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />
+            <path d="M9 21V12h6v9" />
+          </svg>
+        </div>
+      )}
 
-      <h2 className="font-tech mb-1 text-lg font-semibold leading-snug tracking-[0.02em] text-[color:var(--foreground)] group-hover:text-[color:var(--accent)] transition-colors">
-        {concept.heroTitle}
-      </h2>
+      <div className="flex flex-col p-6">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <ScoreBadge score={score} />
+          <span className="text-xs text-[color:var(--muted)]">{date}</span>
+        </div>
 
-      <p className="mb-4 line-clamp-2 text-sm leading-relaxed text-[color:var(--muted)]">
-        {concept.summary}
-      </p>
+        <h2 className="font-tech mb-1 text-lg font-semibold leading-snug tracking-[0.02em] text-[color:var(--foreground)] group-hover:text-[color:var(--accent)] transition-colors">
+          {concept.architecturalStyle} for {concept.location}
+        </h2>
 
-      <div className="mt-auto flex flex-wrap gap-2">
-        <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1 text-xs text-[color:var(--muted)]">
-          {concept.architecturalStyle}
-        </span>
-        <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1 text-xs text-[color:var(--muted)]">
-          {climateLabels[concept.climateRegion] ?? concept.climateRegion}
-        </span>
-        <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1 text-xs text-[color:var(--muted)]">
-          {budgetLabels[concept.budgetLevel] ?? concept.budgetLevel}
-        </span>
+        <p className="mb-4 line-clamp-2 text-sm leading-relaxed text-[color:var(--muted)]">
+          {concept.conceptSummary}
+        </p>
+
+        <div className="mt-auto flex flex-wrap gap-2">
+          <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1 text-xs text-[color:var(--muted)]">
+            {concept.architecturalStyle.charAt(0).toUpperCase() +
+              concept.architecturalStyle.slice(1)}
+          </span>
+          <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1 text-xs text-[color:var(--muted)]">
+            {climateLabels[concept.climateType] ?? concept.climateType}
+          </span>
+          <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1 text-xs text-[color:var(--muted)]">
+            {budgetLabels[concept.budgetLevel] ?? concept.budgetLevel}
+          </span>
+        </div>
       </div>
     </Link>
   );
@@ -94,7 +134,15 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center gap-5 py-20 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface)]">
-        <svg viewBox="0 0 24 24" className="h-7 w-7 text-[color:var(--accent)]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-7 w-7 text-[color:var(--accent)]"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />
           <path d="M9 21V12h6v9" />
         </svg>
@@ -116,7 +164,9 @@ function EmptyState() {
 
 export default async function ProjectsDashboard() {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login?redirectTo=/projects");
@@ -124,7 +174,7 @@ export default async function ProjectsDashboard() {
 
   const { data: projects } = await supabase
     .from("projects")
-    .select("id, name, project_id, created_at, data")
+    .select("id, name, project_id, created_at, thumbnail, data")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 

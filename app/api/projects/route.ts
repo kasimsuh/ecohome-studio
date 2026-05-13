@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { GeneratedHomeConcept } from "@/lib/domain/types";
 
 const saveProjectSchema = z.object({
   name: z.string().min(1).max(120),
@@ -50,12 +49,11 @@ export async function POST(request: Request) {
   }
 
   const { name, project_id, data } = parsed.data;
-  const concept = data as GeneratedHomeConcept;
 
   const { data: row, error } = await supabase
     .from("projects")
     .upsert(
-      { user_id: user.id, name, project_id, data: concept },
+      { user_id: user.id, name, project_id, data },
       { onConflict: "project_id" },
     )
     .select("id, name, project_id, created_at")

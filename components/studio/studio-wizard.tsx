@@ -12,18 +12,18 @@ import {
   StudioInspirationStep,
   StudioReviewStep,
   StudioWizardAlert,
-  StudioWizardSteps
+  StudioWizardSteps,
 } from "@/components/studio/studio-wizard-panels";
 import {
   MAX_INSPIRATION_IMAGES,
   MIN_DESCRIPTION_LENGTH,
   budgetOptions,
-  climateOptions
+  climateOptions,
 } from "@/lib/domain/constants";
 import { createInspirationImageRecord } from "@/lib/domain/mock-data";
 import {
   adaptStructuredConceptToGeneratedHomeConcept,
-  isStructuredGeneratedHomeConceptPayload
+  isStructuredGeneratedHomeConceptPayload,
 } from "@/lib/domain/structured-home-adapter";
 import type { GenerateHomeRequest } from "@/lib/domain/home-concept-schema";
 import type {
@@ -31,7 +31,7 @@ import type {
   ClimateRegion,
   GeneratedHomeConcept,
   InspirationImage,
-  StyleAnalysis
+  StyleAnalysis,
 } from "@/lib/domain/types";
 import { getProjectStorageKey } from "@/lib/session";
 
@@ -44,15 +44,15 @@ interface FormState {
 
 const initialFormState: FormState = {
   description: "",
-  location: "Toronto, Canada",
-  climateRegion: "cold",
-  budgetLevel: "medium"
+  location: "",
+  climateRegion: "temperate",
+  budgetLevel: "medium",
 };
 
 const steps = ["Vision", "Inspiration", "Context", "Review"];
 
 export function StudioWizard({
-  initialDescription = ""
+  initialDescription = "",
 }: {
   initialDescription?: string;
 }) {
@@ -60,10 +60,14 @@ export function StudioWizard({
   const [stepIndex, setStepIndex] = useState(0);
   const [formState, setFormState] = useState<FormState>(() => ({
     ...initialFormState,
-    description: initialDescription.trim()
+    description: initialDescription.trim(),
   }));
-  const [inspirationImages, setInspirationImages] = useState<InspirationImage[]>([]);
-  const [styleAnalysis, setStyleAnalysis] = useState<StyleAnalysis | null>(null);
+  const [inspirationImages, setInspirationImages] = useState<
+    InspirationImage[]
+  >([]);
+  const [styleAnalysis, setStyleAnalysis] = useState<StyleAnalysis | null>(
+    null,
+  );
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [analysisPending, setAnalysisPending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -74,17 +78,21 @@ export function StudioWizard({
       description: formState.description,
       location: formState.location,
       climateRegion:
-        climateOptions.find((option) => option.value === formState.climateRegion)
-          ?.label ?? formState.climateRegion,
+        climateOptions.find(
+          (option) => option.value === formState.climateRegion,
+        )?.label ?? formState.climateRegion,
       budgetLevel:
         budgetOptions.find((option) => option.value === formState.budgetLevel)
           ?.label ?? formState.budgetLevel,
-      inspirationCount: inspirationImages.length
+      inspirationCount: inspirationImages.length,
     }),
-    [formState, inspirationImages]
+    [formState, inspirationImages],
   );
 
-  function updateFormState<K extends keyof FormState>(key: K, value: FormState[K]) {
+  function updateFormState<K extends keyof FormState>(
+    key: K,
+    value: FormState[K],
+  ) {
     setFormState((current) => ({ ...current, [key]: value }));
   }
 
@@ -107,7 +115,7 @@ export function StudioWizard({
     try {
       const response = await fetch("/api/analyze-inspiration", {
         method: "POST",
-        body: formData
+        body: formData,
       });
 
       if (!response.ok) {
@@ -124,10 +132,14 @@ export function StudioWizard({
       setInspirationImages(payload.inspirationImages);
     } catch (error) {
       setUploadError(
-        error instanceof Error ? error.message : "Could not analyze those images."
+        error instanceof Error
+          ? error.message
+          : "Could not analyze those images.",
       );
       setStyleAnalysis(null);
-      setInspirationImages(files.map((file) => createInspirationImageRecord(file)));
+      setInspirationImages(
+        files.map((file) => createInspirationImageRecord(file)),
+      );
     } finally {
       setAnalysisPending(false);
     }
@@ -144,16 +156,20 @@ export function StudioWizard({
     }
 
     if (files.length > MAX_INSPIRATION_IMAGES) {
-      setUploadError(`Upload up to ${MAX_INSPIRATION_IMAGES} inspiration images.`);
+      setUploadError(
+        `Upload up to ${MAX_INSPIRATION_IMAGES} inspiration images.`,
+      );
       return;
     }
 
     const invalidFile = files.find(
-      (file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+      (file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type),
     );
 
     if (invalidFile) {
-      setUploadError("Only JPG, PNG, and WEBP files are supported in this starter.");
+      setUploadError(
+        "Only JPG, PNG, and WEBP files are supported in this starter.",
+      );
       return;
     }
 
@@ -161,15 +177,20 @@ export function StudioWizard({
   }
 
   function validateStep(index: number) {
-    if (index === 0 && formState.description.trim().length < MIN_DESCRIPTION_LENGTH) {
+    if (
+      index === 0 &&
+      formState.description.trim().length < MIN_DESCRIPTION_LENGTH
+    ) {
       setFormError(
-        `Describe the dream home in at least ${MIN_DESCRIPTION_LENGTH} characters so the concept has enough context.`
+        `Describe the dream home in at least ${MIN_DESCRIPTION_LENGTH} characters so the concept has enough context.`,
       );
       return false;
     }
 
     if (index === 2 && !formState.location.trim()) {
-      setFormError("Add a location so climate-specific recommendations stay grounded.");
+      setFormError(
+        "Add a location so climate-specific recommendations stay grounded.",
+      );
       return false;
     }
 
@@ -203,16 +224,16 @@ export function StudioWizard({
     const requestBody: GenerateHomeRequest = {
       ...formState,
       inspirationImages,
-      styleAnalysis
+      styleAnalysis,
     };
 
     try {
       const response = await fetch("/api/generate-home", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -228,7 +249,7 @@ export function StudioWizard({
       const concept = adaptStructuredConceptToGeneratedHomeConcept(payload);
       window.sessionStorage.setItem(
         getProjectStorageKey(concept.projectId),
-        JSON.stringify(concept)
+        JSON.stringify(concept),
       );
       router.push(`/results/${concept.projectId}`);
     } catch (error) {
@@ -236,20 +257,22 @@ export function StudioWizard({
         const fallbackResponse = await fetch("/api/generate-concept", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(requestBody),
         });
 
         if (!fallbackResponse.ok) {
           const payload = (await fallbackResponse.json()) as { error?: string };
-          throw new Error(payload.error || "Could not generate a home concept.");
+          throw new Error(
+            payload.error || "Could not generate a home concept.",
+          );
         }
 
         const concept = (await fallbackResponse.json()) as GeneratedHomeConcept;
         window.sessionStorage.setItem(
           getProjectStorageKey(concept.projectId),
-          JSON.stringify(concept)
+          JSON.stringify(concept),
         );
         router.push(`/results/${concept.projectId}`);
       } catch (fallbackError) {
@@ -280,7 +303,7 @@ export function StudioWizard({
               Designing your home concept
             </p>
             <p className="text-sm text-[color:var(--muted)]">
-              This takes about 30 seconds. Your concept is being generated now.
+              This takes about 1 minute. Your concept is being generated now.
             </p>
           </div>
         </div>
@@ -290,7 +313,9 @@ export function StudioWizard({
             {stepIndex === 0 ? (
               <StudioBriefStep
                 description={formState.description}
-                onDescriptionChange={(value) => updateFormState("description", value)}
+                onDescriptionChange={(value) =>
+                  updateFormState("description", value)
+                }
               />
             ) : null}
 
@@ -308,14 +333,21 @@ export function StudioWizard({
                 budgetLevel={formState.budgetLevel}
                 climateRegion={formState.climateRegion}
                 location={formState.location}
-                onBudgetLevelChange={(value) => updateFormState("budgetLevel", value)}
-                onClimateRegionChange={(value) => updateFormState("climateRegion", value)}
+                onBudgetLevelChange={(value) =>
+                  updateFormState("budgetLevel", value)
+                }
+                onClimateRegionChange={(value) =>
+                  updateFormState("climateRegion", value)
+                }
                 onLocationChange={(value) => updateFormState("location", value)}
               />
             ) : null}
 
             {stepIndex === 3 ? (
-              <StudioReviewStep styleAnalysis={styleAnalysis} summary={reviewSummary} />
+              <StudioReviewStep
+                styleAnalysis={styleAnalysis}
+                summary={reviewSummary}
+              />
             ) : null}
 
             {formError ? <StudioWizardAlert message={formError} /> : null}
@@ -324,7 +356,10 @@ export function StudioWizard({
           <div className="flex shrink-0 flex-col gap-4 pt-4 md:flex-row md:items-center md:justify-between">
             <div className="text-sm leading-6 text-[color:var(--muted)]">
               Want to inspect a complete sample without generating one?{" "}
-              <Link href="/results/demo" className="font-semibold text-[color:var(--accent)]">
+              <Link
+                href="/results/demo"
+                className="font-semibold text-[color:var(--accent)]"
+              >
                 Open the demo result
               </Link>
               .

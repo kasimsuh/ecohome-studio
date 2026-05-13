@@ -3,10 +3,10 @@ import { NextResponse } from "next/server";
 import { buildGenerateHomeResponseHeaders } from "@/lib/api/generate-home-response";
 import { generateStructuredHomeConceptWithFeatherless } from "@/lib/ai/featherless";
 import { generateHomeRequestSchema } from "@/lib/domain/home-concept-schema";
+import type { GeneratedHomeConceptPayload } from "@/lib/domain/home-concept-schema";
 import { createFallbackStructuredHomeConcept } from "@/lib/domain/structured-home-fallback";
 import { retrieveSustainabilityContext } from "@/lib/rag/retriever";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { GeneratedHomeConcept } from "@/lib/domain/types";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -16,24 +16,28 @@ function getErrorMessage(error: unknown) {
   return String(error);
 }
 
-async function trySaveProject(concept: GeneratedHomeConcept) {
+async function trySaveProject(concept: GeneratedHomeConceptPayload) {
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) return;
 
-    await supabase.from("projects").upsert(
+    const { error } = await supabase.from("projects").upsert(
       {
         user_id: user.id,
-        name: concept.heroTitle,
+        name: `${concept.architecturalStyle} for ${concept.location}`,
         project_id: concept.projectId,
         data: concept,
       },
       { onConflict: "project_id" },
     );
-  } catch {
-    // Non-fatal — guest users and DB errors should not block the response
+
+    if (error) {
+      console.error("[trySaveProject] upsert failed:", error);
+    }
+  } catch (err) {
+    console.error("[trySaveProject] unexpected error:", err);
   }
 }
 
