@@ -84,7 +84,7 @@ export type SceneStyleProfile = {
   };
 };
 
-const exteriorColorMap: Record<string, string> = {
+export const exteriorColorMap: Record<string, string> = {
   "sandstone-beige": "#dcc8a4",
   "warm-white": "#ece6d6",
   "warm-grey": "#bcb6ac",
@@ -1488,17 +1488,21 @@ function ButterflyRoof({
   const rise = w * 0.1;
   const angle = Math.atan2(rise, halfW);
   const matCfg = resolveRoofMaterialConfig(roofMaterial, roofColor);
+  // Each half-mesh rotates about its group origin; the inner corner sinks by
+  // (halfW/(2·cos(angle))) · sin(angle). Lift the whole roof so the trough
+  // sits at the building top instead of clipping into the upper-floor walls.
+  const verticalLift = (halfW * Math.tan(angle)) / 2 + 0.1;
 
   return (
-    <group position={[0, top, 0]}>
+    <group position={[0, top + verticalLift, 0]}>
       <group position={[-halfW / 2, 0, 0]} rotation={[0, 0, -angle]}>
-        <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+        <mesh castShadow receiveShadow>
           <boxGeometry args={[halfW / Math.cos(angle), 0.18, d]} />
           <meshStandardMaterial color={matCfg.color} roughness={matCfg.roughness} metalness={matCfg.metalness} />
         </mesh>
       </group>
       <group position={[halfW / 2, 0, 0]} rotation={[0, 0, angle]}>
-        <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+        <mesh castShadow receiveShadow>
           <boxGeometry args={[halfW / Math.cos(angle), 0.18, d]} />
           <meshStandardMaterial color={matCfg.color} roughness={matCfg.roughness} metalness={matCfg.metalness} />
         </mesh>
@@ -1885,17 +1889,22 @@ function FurnitureItem({ item }: { item: FurniturePlacement }) {
 
 function InteriorFurniture({
   floorPlan,
+  model3D,
   sceneSeed,
   profile,
 }: {
   floorPlan: FloorPlan;
+  model3D: Model3D;
   sceneSeed: string;
   profile: SceneStyleProfile;
 }) {
-  const furniture = useMemo(
-    () => getFurniturePlacements(floorPlan, sceneSeed, profile),
-    [floorPlan, sceneSeed, profile],
-  );
+  const furniture = useMemo(() => {
+    const visibleFloorPlan = {
+      ...floorPlan,
+      rooms: floorPlan.rooms.filter((r) => r.floor < model3D.floors),
+    };
+    return getFurniturePlacements(visibleFloorPlan, sceneSeed, profile);
+  }, [floorPlan, model3D.floors, sceneSeed, profile]);
 
   return (
     <>
@@ -2596,13 +2605,17 @@ function HomeScene({
       <Roof floorPlan={floorPlan} model3D={model3D} profile={profile} sceneSeed={sceneSeed} />
       <Dormers floorPlan={floorPlan} model3D={model3D} profile={profile} sceneSeed={sceneSeed} />
 
-      {model3D.windows.map((w, i) => (
-        <Window key={`win-${i}`} opening={w} floorPlan={floorPlan} profile={profile} />
-      ))}
-      {model3D.doors.map((d, i) => (
-        <Door key={`door-${i}`} opening={d} floorPlan={floorPlan} profile={profile} />
-      ))}
-      <InteriorFurniture floorPlan={floorPlan} sceneSeed={sceneSeed} profile={profile} />
+      {model3D.windows
+        .filter((w) => w.floor < model3D.floors)
+        .map((w, i) => (
+          <Window key={`win-${i}`} opening={w} floorPlan={floorPlan} profile={profile} />
+        ))}
+      {model3D.doors
+        .filter((d) => d.floor < model3D.floors)
+        .map((d, i) => (
+          <Door key={`door-${i}`} opening={d} floorPlan={floorPlan} profile={profile} />
+        ))}
+      <InteriorFurniture floorPlan={floorPlan} model3D={model3D} sceneSeed={sceneSeed} profile={profile} />
       <BodyStyleVolume floorPlan={floorPlan} model3D={model3D} profile={profile} sceneSeed={sceneSeed} />
       <EntryCanopy floorPlan={floorPlan} model3D={model3D} profile={profile} />
       <Deck floorPlan={floorPlan} model3D={model3D} profile={profile} />
@@ -2754,6 +2767,8 @@ export function Home3DPreview({
   className,
   variant = "card",
   onCapture,
+  onOpenStudio,
+  hideOverlayChrome = false,
 }: {
   floorPlan: FloorPlan;
   model3D: Model3D;
@@ -2770,6 +2785,8 @@ export function Home3DPreview({
   className?: string;
   variant?: "card" | "workspace";
   onCapture?: (dataUrl: string) => void;
+  onOpenStudio?: () => void;
+  hideOverlayChrome?: boolean;
 }) {
   const [showFloorPlan, setShowFloorPlan] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<
@@ -2848,26 +2865,41 @@ export function Home3DPreview({
           </Canvas>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex flex-col gap-3 sm:inset-x-5 sm:top-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="pointer-events-auto rounded-[1.25rem] border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.72)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.14)] backdrop-blur-xl">
-            <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
-              Ecohome Presents
-            </p>
-            <h2 className="font-tech mt-1 text-2xl tracking-[0.03em] text-[color:var(--foreground)]">
-              Your sustainable dream home
-            </h2>
+        {!hideOverlayChrome && (
+          <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex flex-col gap-3 sm:inset-x-5 sm:top-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="pointer-events-auto rounded-[1.25rem] border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.72)] p-4 shadow-[0_18px_55px_rgba(45,39,28,0.14)] backdrop-blur-xl">
+              <p className="font-tech text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                Ecohome Presents
+              </p>
+              <h2 className="font-tech mt-1 text-2xl tracking-[0.03em] text-[color:var(--foreground)]">
+                Your sustainable dream home
+              </h2>
+            </div>
+
+            <div className="pointer-events-auto flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowFloorPlan((current) => !current)}
+                className="rounded-full border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.78)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] shadow-[0_12px_35px_rgba(45,39,28,0.12)] backdrop-blur-xl transition hover:border-[color:var(--accent)] hover:text-[color:var(--accent-dark)]"
+                aria-pressed={showFloorPlan}
+              >
+                {showFloorPlan ? "Hide floor plan" : "Show floor plan"}
+              </button>
+              {onOpenStudio && (
+                <button
+                  type="button"
+                  onClick={onOpenStudio}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--accent)] bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_35px_rgba(45,39,28,0.18)] backdrop-blur-xl transition hover:bg-[color:var(--accent-dark)]"
+                >
+                  <span aria-hidden>✦</span>
+                  Studio mode
+                </button>
+              )}
+            </div>
           </div>
+        )}
 
-          <button
-            type="button"
-            onClick={() => setShowFloorPlan((current) => !current)}
-            className="pointer-events-auto rounded-full border border-[rgba(61,93,72,0.18)] bg-[rgba(255,250,242,0.78)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] shadow-[0_12px_35px_rgba(45,39,28,0.12)] backdrop-blur-xl transition hover:border-[color:var(--accent)] hover:text-[color:var(--accent-dark)]"
-            aria-pressed={showFloorPlan}
-          >
-            {showFloorPlan ? "Hide floor plan" : "Show floor plan"}
-          </button>
-        </div>
-
+        {!hideOverlayChrome && (
         <div className="pointer-events-none absolute inset-x-4 bottom-4 z-10 grid gap-3 sm:inset-x-5 sm:bottom-5 xl:grid-cols-[1fr_1fr]">
           {/* Left col – sustainability badges */}
           <div className="pointer-events-auto rounded-[1.25rem] border border-[rgba(61,93,72,0.16)] bg-[rgba(255,250,242,0.7)] p-3 shadow-[0_18px_55px_rgba(45,39,28,0.12)] backdrop-blur-xl">
@@ -2937,8 +2969,9 @@ export function Home3DPreview({
             ) : null}
           </div>
         </div>
+        )}
 
-        {showFloorPlan ? (
+        {!hideOverlayChrome && showFloorPlan ? (
           <div
             className="absolute left-6 right-6 top-6 z-20 flex max-h-[calc(100%-3rem)] flex-col overflow-hidden rounded-[1.5rem] border border-[color:var(--border)] bg-[rgba(255,250,242,0.9)] shadow-[0_24px_80px_rgba(45,39,28,0.2)] backdrop-blur-xl"
             data-testid="floor-plan-overlay"
