@@ -446,9 +446,11 @@ export function FloorPlanDrawing({
 }) {
   const floors = useMemo(() => {
     const set = new Set<number>();
-    floorPlan.rooms.forEach((r) => set.add(r.floor));
+    floorPlan.rooms.forEach((r) => {
+      if (r.floor < model3D.floors) set.add(r.floor);
+    });
     return Array.from(set).sort((a, b) => a - b);
-  }, [floorPlan.rooms]);
+  }, [floorPlan.rooms, model3D.floors]);
 
   const hasSouthGlazing = useMemo(
     () => model3D.windows.some((w) => w.wall === "south"),

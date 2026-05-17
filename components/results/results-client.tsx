@@ -7,6 +7,7 @@ import { ResultsView } from "@/components/results/results-view";
 import { StudioMode } from "@/components/results/studio-mode";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { deriveReportMetrics } from "@/lib/domain/derive-report-metrics";
 import {
   adaptStructuredConceptToGeneratedHomeConcept,
   isStructuredGeneratedHomeConceptPayload
@@ -42,13 +43,14 @@ export function ResultsClient({
 
   const handleSaveStudio = useCallback(
     async (updated: GeneratedHomeConcept) => {
-      setProject(updated);
+      const enriched = deriveReportMetrics(updated);
+      setProject(enriched);
 
       if (typeof window !== "undefined") {
         try {
           window.sessionStorage.setItem(
             getProjectStorageKey(projectId),
-            JSON.stringify(updated),
+            JSON.stringify(enriched),
           );
         } catch {/* sessionStorage may be unavailable */}
       }
@@ -58,7 +60,7 @@ export function ResultsClient({
       const response = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: updated }),
+        body: JSON.stringify({ data: enriched }),
       });
 
       if (!response.ok) {
