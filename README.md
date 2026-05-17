@@ -26,13 +26,14 @@ EcoHome Studio is an end-to-end AI home design platform that takes a plain-langu
 - 🗺️ **2D floor plan** — room-by-room layout with type-coded colour blocks
 - 💡 **Upgrade recommendations** — actionable, impact-rated improvements grounded in real sustainability guidance
 - 🎨 **Inspiration-aware generation** — upload mood board images and the platform extracts palette, materials, and aesthetic cues to steer the output
+- ✦ **Studio Mode** — full-screen editor for fine-tuning the generated home after the fact: swap colors and materials, change roof or body shape, toggle sustainability features, adjust floors and structural details, then save. The sustainability score, environmental impact percentages, climate narrative, and 2D floor plan all re-derive from the edits.
 
 ---
 
 ## 🚀 Product Flow
 
 ```
-Brief → Studio → AI Generation → Results → 3D Preview
+Brief → Studio → AI Generation → Results → 3D Preview → Studio Mode (edit & save)
 ```
 
 1. **Land** — write your dream home brief on the homepage
@@ -40,6 +41,7 @@ Brief → Studio → AI Generation → Results → 3D Preview
 3. **Analyze** — pixel-level image analysis extracts your palette, material preferences, and aesthetic direction
 4. **Generate** — a structured concept is produced through an AI pipeline grounded in curated sustainability guidance
 5. **Explore** — browse the full concept report and orbit the interactive 3D model of your home
+6. **Customize** — open Studio Mode to dial in materials, roof, floors, or sustainability features; saved edits re-score the concept and refresh the report
 
 > Try the live demo instantly at `/results/demo` — no brief required.
 
@@ -119,7 +121,7 @@ The interactive 3D home preview is a fully custom procedural renderer built on R
 
 | Feature | Detail |
 |---|---|
-| **Roof types** | Gable, hip, shed, butterfly, flat — each geometrically accurate |
+| **Roof types** | Gable, hip, shed, flat — each geometrically accurate |
 | **Roof detailing** | Tile/shingle courses, soffits, fascias, gutters, rake boards, dormers |
 | **Roof design styles** | Craftsman, contemporary, traditional — randomly seeded if unspecified |
 | **Body shapes** | Box, L-shape, split-level — with proper massing volumes |
@@ -130,6 +132,41 @@ The interactive 3D home preview is a fully custom procedural renderer built on R
 | **Tree placement** | Seeded-random canopy trees, collision-aware — never placed inside the building footprint |
 
 All geometry is deterministic and seed-stable: the same concept always renders identically.
+
+---
+
+## ✦ Studio Mode
+
+A full-screen post-generation editor reachable from any results page via the **Studio mode** pill on the 3D workspace. Studio Mode lets the user keep iterating on the AI's concept without re-running generation.
+
+### What you can edit
+
+| Group | Controls |
+|---|---|
+| **Color & facade** | Exterior color swatches (8 palette options), facade material (timber, brick, plaster, stone, metal panel, fiber cement) |
+| **Roof** | Roof type (flat, gable, hip, shed), roof material (standing seam, clay tile, asphalt shingle, rubber membrane) |
+| **Sustainability** | Toggles for solar panels, green roof, rainwater tank, native trees, permeable driveway, cross-ventilation |
+| **Structure** | Floors (1–3), body shape (box / L-shape / split-level), dormer count (0–3), chimney count (0–2), outdoor deck |
+
+### How it stays coherent
+
+- **Live normalization** — every keystroke / click in the editor flows through `lib/domain/normalize-model3d.ts`, which clamps floor count, forces `dormerCount=0` on non-gable roofs, disables the deck below two floors, and migrates legacy butterfly roofs to gable on first open.
+- **Render-time hardening** — windows, doors, and furniture on floors that no longer exist are filtered out of both the 3D scene and the 2D floor plan. Floor reductions are non-destructive: the underlying data is preserved and reappears if floors are bumped back up.
+- **Editor UX hints** — controls that the renderer would silently ignore (dormers on flat roofs, deck without a second floor, green roof on non-flat roofs) appear disabled with a one-line explanation so the editor never lies to the user.
+
+### What re-derives on save
+
+When the user presses **Save changes**, `lib/domain/derive-report-metrics.ts` recomputes:
+
+- **Sustainability score** — six sub-scores derived from a climate baseline minus per-feature penalties for disabled sustainability features and per-floor material/affordability penalties for additional floors.
+- **Environmental impact** — the four percentage strings (energy, water, embodied carbon, resilience gain) re-derive from the new score.
+- **Climate narrative** — the closing "the concept reinforces that with…" sentence reflects exactly the sustainability features currently enabled.
+
+AI-curated text (upgrades list, design principles, materials, architectural style, hero title, interior/exterior concepts) intentionally stays put — those are part of the original creative intent and shouldn't drift on user edits.
+
+### Persistence
+
+Saved edits write to Supabase via `PATCH /api/projects/[projectId]` (request body `{ data: GeneratedHomeConcept }`) and mirror to `sessionStorage` for instant reloads. The demo project (`/results/demo`) keeps edits in session only.
 
 ---
 
@@ -149,7 +186,9 @@ All geometry is deterministic and seed-stable: the same concept always renders i
 │   ├── results/
 │   │   ├── home-3d-preview.tsx      # Interactive 3D model + floor plan
 │   │   ├── results-rail.tsx         # Report-style results sidebar
-│   │   └── results-view.tsx         # Lazy-loaded results container
+│   │   ├── results-view.tsx         # Lazy-loaded results container
+│   │   ├── studio-mode.tsx          # Full-screen editor overlay
+│   │   └── studio-mode-editor.tsx   # Color / roof / sustainability / structure controls
 │   └── studio/
 │       └── studio-wizard.tsx        # Multi-step brief flow
 │
@@ -158,6 +197,8 @@ All geometry is deterministic and seed-stable: the same concept always renders i
 │   │   └── featherless.ts           # Structured generation client
 │   ├── domain/
 │   │   ├── home-concept-schema.ts   # Zod schema for all concepts
+│   │   ├── normalize-model3d.ts     # Clamps user edits to coherent state
+│   │   ├── derive-report-metrics.ts # Re-derives score / impact / narrative on save
 │   │   └── types.ts                 # Core domain types
 │   ├── inspiration/
 │   │   └── analyze-uploaded-images.ts

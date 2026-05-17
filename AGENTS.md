@@ -45,6 +45,7 @@ EcoHome Studio exists to bridge the gap between:
    - sustainability upgrades
    - environmental impact snapshot
    - visual prompt starters
+6. User opens **Studio Mode** from the 3D workspace to edit the concept — colors, materials, roof, floors, sustainability features, structural details — and saves. The sustainability score, environmental impact, climate narrative, and 2D floor plan re-derive from the edits.
 
 ---
 
@@ -199,7 +200,32 @@ Generated concepts are stored in `window.sessionStorage` using keys shaped like:
 
 - `ecohome:project:<projectId>`
 
-This is intentional for demo simplicity.
+Real (signed-in) projects also persist to Supabase via the `projects` table, fetched server-side in `app/results/[projectId]/page.tsx`. The demo project (`projectId === "demo"`) is session-only.
+
+### Studio Mode (post-generation editor)
+
+`components/results/studio-mode.tsx` is a full-screen overlay reachable from the **Studio mode** pill on the 3D workspace. It lets users edit the generated concept without re-running AI generation.
+
+Files in this subsystem:
+
+- `components/results/studio-mode.tsx`
+  - Overlay shell. Holds the local `draftModel3D` state, the sticky header / scrollable body / sticky-footer layout, and the Save / Reset action buttons. Embeds the same `Home3DPreview` used on the results page (in `variant="workspace"` with `hideOverlayChrome`) so edits are visible live.
+- `components/results/studio-mode-editor.tsx`
+  - Right-hand control panel with four sections (Color & Facade, Roof, Sustainability, Structure). Stateless controlled component — every change calls a single `onChange` prop.
+- `lib/domain/normalize-model3d.ts`
+  - Pure `normalizeStudioModel3D(model)`. Clamps floor count to [1, 4], forces `dormerCount=0` on non-gable roofs, clamps `chimneyCount` to [0, 2], disables `hasDeck` below two floors, and migrates `roofType === "butterfly"` to `"gable"`. Called on every editor edit and on mount.
+- `lib/domain/derive-report-metrics.ts`
+  - Pure `deriveReportMetrics(project)`. Re-computes `sustainabilityScore`, `environmentalImpact`, and `climateNarrative` from the edited `model3D` + `climateRegion` + `budgetLevel`. Called once in `handleSaveStudio` before `setProject` / sessionStorage write / DB PATCH.
+- `app/api/projects/[projectId]/route.ts`
+  - PATCH accepts either `{ thumbnail }`, `{ data }`, or both. Studio Mode saves use `{ data: GeneratedHomeConcept }`. Auth required (Supabase session); the demo project skips this path entirely.
+
+Design rules to preserve:
+
+1. **The editor never lies.** Whenever a control's effect would be silently dropped by the renderer (dormers without a gable roof, deck without a second floor), disable the control and show a one-line italic hint. Hard constraints flow through `normalizeStudioModel3D`; UX hints live in `studio-mode-editor.tsx`.
+2. **Floor reductions are non-destructive.** Reducing `model3D.floors` filters upper-floor rooms / furniture / windows / doors at render time only — the underlying `floorPlan.rooms` and `model3D.windows/doors` arrays are preserved, so increasing floors again restores the prior state.
+3. **The renderer is the source of truth for what's coherent.** When adding a new Studio Mode control, check whether the renderer already handles the value gracefully. If it ignores the value silently, either add a render-time filter (so any data source benefits) or surface a disabled state in the editor (or both — see the floors / dormers / deck pattern).
+4. **Butterfly roofs are retired from the editor.** The `RoofType` union still includes `"butterfly"` for legacy data; the picker filters it out and the normalizer migrates it to gable on first open.
+5. **AI-curated text doesn't re-derive on save.** Only score, environmental impact, and climate narrative re-derive. `sustainabilityUpgrades`, `materials`, `designPrinciples`, `architecturalStyle`, `heroTitle`, `interiorConcepts`, `exteriorConcepts`, `summary` are part of the AI's original creative intent and must stay put.
 
 ---
 
@@ -462,11 +488,12 @@ Favor additions that strengthen the core concept:
 
 - visual concept generation
 - better climate adaptation logic
-- richer sustainability scoring
+- richer sustainability scoring (current scoring lives in `lib/domain/derive-report-metrics.ts` — extend the feature-contributions table or add new structural penalties here)
 - stronger budget reasoning
 - floor plan or room-layout assistance
 - image-analysis improvements
 - future 3D / preview surfaces
+- additional Studio Mode controls (see the "Studio Mode" architecture section for the design rules to preserve)
 
 ---
 
@@ -477,6 +504,10 @@ If asked to make changes, these files are the most common entry points:
 - `app/page.tsx` for homepage UX
 - `app/studio/page.tsx` and `components/studio/studio-wizard.tsx` for the core creation flow
 - `components/results/results-view.tsx` for results UX
+- `components/results/studio-mode.tsx` and `components/results/studio-mode-editor.tsx` for the post-generation editor overlay
+- `components/results/home-3d-preview.tsx` for the 3D scene / renderer hardening
+- `lib/domain/normalize-model3d.ts` for Studio Mode invariants
+- `lib/domain/derive-report-metrics.ts` for score / impact / narrative re-derivation
 - `lib/ai/contracts.ts` and `lib/ai/index.ts` for provider work
 - `lib/domain/types.ts` and `lib/domain/validation.ts` for schema changes
 - `app/globals.css` for theme, font, and shared visual rules
