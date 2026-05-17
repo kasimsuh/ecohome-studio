@@ -16,6 +16,19 @@ EcoHome Studio combines AI-powered design generation, retrieval-augmented sustai
 
 ---
 
+## 🖼️ Take a Tour
+
+<div align="center">
+
+| Homescreen | Studio | Results |
+|---|---|---|
+| ![Homescreen — write your dream-home brief](public/images/homescreen.png) | ![Studio — refine the brief, upload inspiration, set climate & budget](public/images/studio.png) | ![Results — full sustainability report and interactive 3D preview](public/images/results.png) |
+| *Write your brief.* | *Refine the concept.* | *Explore the report + 3D model.* |
+
+</div>
+
+---
+
 ## ✨ What EcoHome Studio Does
 
 EcoHome Studio is an end-to-end AI home design platform that takes a plain-language brief and produces a complete, structured home concept including:
