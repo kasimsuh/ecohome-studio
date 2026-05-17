@@ -5,9 +5,11 @@ import type { GeneratedHomeConcept } from "@/lib/domain/types";
 export function ResultsView({
   project,
   onCapture,
+  onOpenStudio,
 }: {
   project: GeneratedHomeConcept;
   onCapture?: (dataUrl: string) => void;
+  onOpenStudio?: () => void;
 }) {
   const hasInteractiveModel = Boolean(project.floorPlan && project.model3D);
 
@@ -34,6 +36,7 @@ export function ResultsView({
           sceneSeed={`${project.projectId}:${project.location}:${project.architecturalStyle}`}
           variant="workspace"
           onCapture={onCapture}
+          onOpenStudio={onOpenStudio}
         />
       </main>
     </div>

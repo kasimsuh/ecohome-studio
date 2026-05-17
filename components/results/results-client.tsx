@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ResultsView } from "@/components/results/results-view";
+import { StudioMode } from "@/components/results/studio-mode";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { deriveReportMetrics } from "@/lib/domain/derive-report-metrics";
 import {
   adaptStructuredConceptToGeneratedHomeConcept,
   isStructuredGeneratedHomeConceptPayload
@@ -23,6 +25,7 @@ export function ResultsClient({
 }) {
   const [project, setProject] = useState<GeneratedHomeConcept | null>(initialProject);
   const [ready, setReady] = useState(initialProject !== null);
+  const [isStudioOpen, setStudioOpen] = useState(false);
   const thumbnailSaved = useRef(false);
 
   const handleCapture = useCallback(
@@ -34,6 +37,43 @@ export function ResultsClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ thumbnail: dataUrl }),
       }).catch(() => {/* non-fatal */});
+    },
+    [projectId],
+  );
+
+  const handleSaveStudio = useCallback(
+    async (updated: GeneratedHomeConcept) => {
+      const enriched = deriveReportMetrics(updated);
+      setProject(enriched);
+
+      if (typeof window !== "undefined") {
+        try {
+          window.sessionStorage.setItem(
+            getProjectStorageKey(projectId),
+            JSON.stringify(enriched),
+          );
+        } catch {/* sessionStorage may be unavailable */}
+      }
+
+      if (projectId === "demo") return;
+
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: enriched }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(
+          payload.error ||
+            (response.status === 401
+              ? "Sign in to save changes."
+              : "Could not save changes."),
+        );
+      }
     },
     [projectId],
   );
@@ -109,5 +149,23 @@ export function ResultsClient({
     );
   }
 
-  return <ResultsView project={project} onCapture={handleCapture} />;
+  const canOpenStudio = Boolean(project.floorPlan && project.model3D);
+
+  return (
+    <>
+      <ResultsView
+        project={project}
+        onCapture={handleCapture}
+        onOpenStudio={canOpenStudio ? () => setStudioOpen(true) : undefined}
+      />
+      {isStudioOpen && canOpenStudio && (
+        <StudioMode
+          project={project}
+          projectId={projectId}
+          onClose={() => setStudioOpen(false)}
+          onSave={handleSaveStudio}
+        />
+      )}
+    </>
+  );
 }
